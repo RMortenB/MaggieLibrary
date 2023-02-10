@@ -1,0 +1,52 @@
+* "maggie.library"
+##base _MaggieBase
+##bias 30
+*
+magSetScreenMemory(pixels,xres,yres)(a0,d0,d1)
+magSetTexture(unit,data)(d0,d1)
+magSetDrawMode(mode)(d0)
+magSetRGB(rgb)(d0)
+*
+magGetDepthBuffer()()
+*
+magSetPerspective(matrix)(a0)
+magSetModelView(matrix)(a0)
+*
+magDrawTrianglesUP(vtx,nVerts)(a0,d0)
+magDrawIndexedTrianglesUP(vtx,nVtx,indx,nIndx)(a0,d0,a1,d1)
+magDrawIndexedPolygonsUP(vtx,nVtx,indx,nIndx)(a0,d0,a1,d1)
+*
+magSetVertexBuffer(vBuffer)(d0)
+magSetIndexBuffer(iBuffer)(d0)
+*
+magDrawTriangles(startVtx,nVtx)(d0,d1)
+magDrawIndexedTriangles(firstVtx,nVtx,startIndx,nIndx)(d0,d1,d2,d3)
+magDrawIndexedPolygons(firstVtx,nVtx,startIndx,nIndx)(d0,d1,d2,d3)
+*
+magDrawLinearSpan(start,end)(a0,a1)
+magDrawSpan(start, end)(a0,a1)
+*
+magAllocateVertexBuffer(nVerts)(d0)
+magUploadVertexBuffer(vBuffer,vtx,startVtx,nVerts)(d0,a0,d1,d2)
+magFreeVertexBuffer(vBuffer)(d0)
+*
+magAllocateIndexBuffer(nIndx)(d0)
+magUploadIndexBuffer(iBuffer,indx,startIndx,nIndx)(d0,a0,d1,d2)
+magFreeIndexBuffer(iBuffer)(d0)
+*
+magAllocateTexture(size)(d0)
+magUploadTexture(txtr,mipmap,data,format)(d0,d1,a0,d2)
+magFreeTexture(txtr)(d0)
+*
+magBeginScene()()
+magEndScene()()
+*
+magBegin()()
+magEnd()()
+*
+magVertex(x,y,z,w)(fp0,fp1,fp2,fp3)
+magTexCoord(texReg,u,v)(d0,fp0,fp1)
+magTexCoord3(texReg,u,v,w)(d0,fp0,fp1,fp2)
+magColour(col)(d0)
+*
+##end
