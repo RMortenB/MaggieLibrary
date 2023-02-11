@@ -170,6 +170,7 @@ void DrawPolygon(struct MaggieTransVertex *vtx, int nVerts, MaggieBase *lib)
 
 static struct MaggieTransVertex transVtxBufferUP[65536];
 static UBYTE transClipCodesUP[65536];
+static struct MaggieTransVertex clippedTri[10];
 
 /*****************************************************************************/
 
@@ -205,7 +206,6 @@ void magDrawTrianglesUP(REG(a0, struct MaggieVertex *vtx), REG(d0, UWORD nVerts)
 			{
 				if(!(transClipCodesUP[i + 0] & transClipCodesUP[i + 1] & transClipCodesUP[i + 2]))
 				{
-					static struct MaggieTransVertex clippedTri[10];
 					clippedTri[0] = transVtxBufferUP[i + 0];
 					clippedTri[1] = transVtxBufferUP[i + 1];
 					clippedTri[2] = transVtxBufferUP[i + 2];
@@ -228,8 +228,6 @@ void magDrawTrianglesUP(REG(a0, struct MaggieVertex *vtx), REG(d0, UWORD nVerts)
 }
 
 /*****************************************************************************/
-
-static struct MaggieTransVertex clippedTri[10];
 
 void magDrawIndexedTrianglesUP(REG(a0, struct MaggieVertex *vtx), REG(d0, UWORD nVerts), REG(a1, UWORD *indx), REG(d1, UWORD nIndx), REG(a6, MaggieBase *lib))
 {

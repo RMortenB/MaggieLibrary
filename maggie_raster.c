@@ -26,14 +26,18 @@ static void SetupHW(UWORD mode, int xres)
 	{
 		drawMode |= 0x0002;
 	}
-	UWORD modulo  = xres << 1;
+	UWORD modulo = 2;
 	if(mode & MAG_DRAWMODE_32BIT)
 	{
+		modulo = 4;
+	}
+	else
+	{
 		drawMode |= 0x0004;
-		modulo <<= 1;
-
 	}
 	maggieRegs->mode = drawMode;
+	maggieRegs->modulo = modulo;
+	maggieRegs->lightRGBA = 0x00ffffff;
 }
 
 /*****************************************************************************/

@@ -14,6 +14,7 @@ void magSetScreenMemory(REG(a0, APTR *pixels), REG(d0, UWORD xres), REG(d1, UWOR
 
 void magSetTexture(REG(d0, UWORD unit), REG(d1, UWORD txtr), REG(a6, MaggieBase *lib))
 {
+	lib->txtrIndex = txtr;
 }
 
 /*****************************************************************************/
