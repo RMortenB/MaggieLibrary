@@ -76,6 +76,27 @@ void NormaliseVertexBuffer(struct MaggieTransVertex *vtx, int nVerts, UBYTE *cli
 
 /*****************************************************************************/
 
+void NormaliseClippedVertexBuffer(struct MaggieTransVertex *vtx, int nVerts)
+{
+	for(int i = 0; i < nVerts; ++i)
+	{
+		float oow = 1.0f / vtx[i].pos.w;
+
+		vtx[i].pos.x = offsetScaleX * (vtx[i].pos.x * oow + 1.0f);
+		vtx[i].pos.y = offsetScaleY * (vtx[i].pos.y * oow + 1.0f);
+		vtx[i].pos.z = vtx[i].pos.z * oow * 65536.0f * 65535.0f;
+		vtx[i].pos.w = oow;
+		for(int j = 0; j < MAGGIE_MAX_TEXCOORDS; ++j)
+		{
+			vtx[i].tex[j].u = vtx[i].tex[j].u * oow;
+			vtx[i].tex[j].v = vtx[i].tex[j].v * oow;
+		}
+		vtx[i].rgba = vtx[i].rgba;
+	}
+}
+
+/*****************************************************************************/
+
 void DrawTriangle(struct MaggieTransVertex *vtx0, struct MaggieTransVertex *vtx1, struct MaggieTransVertex *vtx2, MaggieBase *lib)
 {
 	float x0 = vtx1->pos.x - vtx0->pos.x;
@@ -109,6 +130,44 @@ void DrawTriangle(struct MaggieTransVertex *vtx0, struct MaggieTransVertex *vtx1
 
 /*****************************************************************************/
 
+void DrawPolygon(struct MaggieTransVertex *vtx, int nVerts, MaggieBase *lib)
+{
+	if(nVerts < 3)
+		return;
+	float x0 = vtx[1].pos.x - vtx[0].pos.x;
+	float y0 = vtx[1].pos.y - vtx[0].pos.y;
+	float x1 = vtx[2].pos.x - vtx[0].pos.x;
+	float y1 = vtx[2].pos.y - vtx[0].pos.y;
+
+	if(x0 * y1 - x1 * y0 > 0.0f)
+	{
+		TextOut(lib, "Culled");
+		return;
+	}
+	int miny = vtx[0].pos.y;
+	int maxy = vtx[0].pos.y;
+	for(int i = 1; i < nVerts; ++i)
+	{
+		if(miny > vtx[i].pos.y)
+		{
+			miny = vtx[i].pos.y;
+		}
+		if(maxy < vtx[i].pos.y)
+		{
+			maxy = vtx[i].pos.y;
+		}
+	}
+	int prev = nVerts - 1;
+	for(int i = 0; i < nVerts; ++i)
+	{
+		DrawEdge(&vtx[prev], &vtx[i], lib);	
+		prev = i;
+	}
+	DrawSpans(miny, maxy, lib);
+}
+
+/*****************************************************************************/
+
 static struct MaggieTransVertex transVtxBufferUP[65536];
 static UBYTE transClipCodesUP[65536];
 
@@ -121,7 +180,6 @@ void magDrawTrianglesUP(REG(a0, struct MaggieVertex *vtx), REG(d0, UWORD nVerts)
 
 	if(clipRes == CLIPPED_OUT)
 	{
-		TextOut(lib, "CLIPPED_OUT");
 		return;
 	}
 
@@ -132,22 +190,7 @@ void magDrawTrianglesUP(REG(a0, struct MaggieVertex *vtx), REG(d0, UWORD nVerts)
 
 	if(clipRes == CLIPPED_IN)
 	{
-		TextOut(lib, "CLIPPED_IN");
-
-		for(int i = 0; i < nVerts; ++i)
-		{
-			TextOut(lib, "tvtx %d %d %d %d", (int)transVtxBufferUP[i].pos.x, (int)transVtxBufferUP[i].pos.y, (int)transVtxBufferUP[i].pos.z, (int)transVtxBufferUP[i].pos.w);
-		}
-		for(int i = 0; i < nVerts; ++i)
-		{
-			TextOut(lib, "clip %d 0x%x", i, transClipCodesUP[i]);
-		}
 		NormaliseVertexBuffer(transVtxBufferUP, nVerts, transClipCodesUP);
-
-		for(int i = 0; i < nVerts; ++i)
-		{
-			TextOut(lib, "tvtx %d %d %d %d", (int)transVtxBufferUP[i].pos.x, (int)transVtxBufferUP[i].pos.y, (int)transVtxBufferUP[i].pos.z, (int)transVtxBufferUP[i].pos.w);
-		}
 
 		for(int i = 0; i < nVerts; i += 3)
 		{
@@ -156,9 +199,33 @@ void magDrawTrianglesUP(REG(a0, struct MaggieVertex *vtx), REG(d0, UWORD nVerts)
 	}
 	else if(clipRes == CLIPPED_PARTIAL)
 	{
-		TextOut(lib, "CLIPPED_PARTIAL");
 		UWORD *screen = (UWORD *)lib->screen;
 		screen[lib->yres / 2 * lib->xres + lib->xres / 2] = ~0;
+
+		for(int i = 0; i < nVerts; i += 3)
+		{
+			if(transClipCodesUP[i + 0] | transClipCodesUP[i + 1] | transClipCodesUP[i + 2])
+			{
+				if(!(transClipCodesUP[i + 0] & transClipCodesUP[i + 1] & transClipCodesUP[i + 2]))
+				{
+					static struct MaggieTransVertex clippedTri[10];
+					clippedTri[0] = transVtxBufferUP[i + 0];
+					clippedTri[1] = transVtxBufferUP[i + 1];
+					clippedTri[2] = transVtxBufferUP[i + 2];
+					int nClippedVerts = ClipPolygon(clippedTri, 3);
+					if(nClippedVerts > 2)
+					{
+						NormaliseClippedVertexBuffer(clippedTri, nClippedVerts);
+						DrawPolygon(clippedTri, nClippedVerts, lib);
+					}
+				}
+			}
+			else
+			{
+				NormaliseClippedVertexBuffer(&transVtxBufferUP[i], 3);
+				DrawTriangle(&transVtxBufferUP[i + 0], &transVtxBufferUP[i + 1], &transVtxBufferUP[i + 2], lib);
+			}
+		}
 	}
 	DisownBlitter();
 }
@@ -221,6 +288,13 @@ void magDrawIndexedPolygonsUP(REG(a0, struct MaggieVertex *vtx), REG(d0, UWORD n
 
 	}
 	DisownBlitter();
+}
+
+/*****************************************************************************/
+
+void FlushImmediateMode(MaggieBase *lib)
+{
+//	magDrawTriangles();
 }
 
 /*****************************************************************************/

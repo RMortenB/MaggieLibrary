@@ -272,5 +272,10 @@ void DrawSpans(int miny, int maxy, MaggieBase *lib);
 
 /*****************************************************************************/
 
+void FlushImmediateMode(MaggieBase *lib);
+
+/*****************************************************************************/
+
+int ClipPolygon(struct MaggieTransVertex *verts, int nVerts);
 
 #endif // MAGGIE_INTERNAL_H_INCLUDED
