@@ -25,7 +25,6 @@ void magSetDrawMode(REG(d0, UWORD mode), REG(a6, MaggieBase *lib))
 	{
 		struct ExecBase *SysBase = lib->sysBase;
 		lib->depthBuffer = AllocMem(MAGGIE_MAX_XRES * MAGGIE_MAX_YRES * sizeof(UWORD), MEMF_ANY | MEMF_CLEAR);
-
 	}
 	lib->drawMode = mode;
 }
@@ -384,7 +383,6 @@ void magBeginScene(REG(a6, MaggieBase *lib))
 	struct ExecBase *SysBase = lib->sysBase;
 	ObtainSemaphore(&lib->lock);
 	DebugReset();
-	memset(lib->depthBuffer, 0xff, sizeof(unsigned short) * lib->xres * lib->yres);
 }
 
 /*****************************************************************************/
@@ -473,6 +471,26 @@ void magColour(REG(d0, ULONG col), REG(a6, MaggieBase *lib))
 {
 	struct MaggieVertex *vtx = (struct MaggieVertex *)&(lib->vertexBuffers[lib->immModeVtx][2]);
 	vtx[lib->nIModeVtx].rgba = (col & 0xff00) | ((col >> 8) & 0xff);
+}
+
+/*****************************************************************************/
+
+void magClear(REG(d0, UWORD buffers), REG(a6, MaggieBase *lib))
+{
+	struct ExecBase *SysBase = lib->sysBase;
+	if(buffers & MAG_CLEAR_COLOUR)
+	{
+		int size = (lib->drawMode & MAG_DRAWMODE_32BIT) ? lib->xres * lib->yres * 4 : lib->xres * lib->yres * 2;
+		memset(lib->screen, 0, size);
+	}
+	if(buffers & MAG_CLEAR_DEPTH)
+	{
+		if(lib->depthBuffer)
+		{
+			int size = lib->xres * lib->yres * 2;
+			memset(lib->depthBuffer, 0xff, size);
+		}
+	}
 }
 
 /*****************************************************************************/

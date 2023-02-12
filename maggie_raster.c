@@ -15,7 +15,7 @@ static void SetTexture(APTR txtrData, UWORD size)
 
 /*****************************************************************************/
 
-static void SetupHW(UWORD mode, int xres)
+static void SetupHW(UWORD mode)
 {
 	UWORD drawMode = 0;
 	if(mode & MAG_DRAWMODE_BILINEAR)
@@ -426,7 +426,7 @@ void DrawSpans(int miny, int maxy, MaggieBase *lib)
 		APTR txtrData = GetTextureData(lib->textures[lib->txtrIndex]);
 		UWORD txtrSize = lib->textures[lib->txtrIndex][0];
 		SetTexture(txtrData, txtrSize);
-		SetupHW(lib->drawMode, lib->xres);
+		SetupHW(lib->drawMode);
 		if(lib->drawMode & MAG_DRAWMODE_32BIT)
 		{
 			ULONG *pixels = ((ULONG *)lib->screen) + miny * lib->xres;

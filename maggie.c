@@ -121,6 +121,7 @@ static APTR functionTable[] =
 	magTexCoord,
 	magTexCoord3,
 	magColour,
+	magClear,
 	(APTR)-1
 };
 

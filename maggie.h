@@ -97,4 +97,10 @@ void magTexCoord(int texReg, float u, float v);
 void magTexCoord3(int texReg, float u, float v, float w);
 void magColour(ULONG col);
 
+/*****************************************************************************/
+
+void magClear(UWORD buffers);
+
+/*****************************************************************************/
+
 #endif // MAGGIE_H_INCLUDED

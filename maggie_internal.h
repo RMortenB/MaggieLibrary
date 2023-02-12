@@ -237,6 +237,10 @@ void magTexCoord3(REG(d0, UWORD texReg), REG(fp0, float u), REG(fp1, float v), R
 void magColour(REG(d0, ULONG col), REG(a6, MaggieBase *lib));
 
 /*****************************************************************************/
+
+void magClear(REG(d0, UWORD buffers), REG(a6, MaggieBase *lib));
+
+/*****************************************************************************/
 // Private functions
 
 ULONG GetTextureMipMapSize(UWORD texSize);

@@ -3,8 +3,6 @@
 #include "maggie_internal.h"
 #include <math.h>
 
-#define MAX_POLYGONSIZE 16
-
 /*****************************************************************************/
 
 static void LerpVertex(struct MaggieTransVertex *res, const struct MaggieTransVertex *v0, const struct MaggieTransVertex *v1, float t)
@@ -26,8 +24,8 @@ static void LerpVertex(struct MaggieTransVertex *res, const struct MaggieTransVe
 
 int ClipPolygon(struct MaggieTransVertex *verts, int nVerts)
 {
-	static struct MaggieTransVertex tmpPoly0[MAX_POLYGONSIZE + 6];
-	static struct MaggieTransVertex tmpPoly1[MAX_POLYGONSIZE + 6];
+	static struct MaggieTransVertex tmpPoly0[MAG_MAX_POLYSIZE + 6];
+	static struct MaggieTransVertex tmpPoly1[MAG_MAX_POLYSIZE + 6];
 
 	const struct MaggieTransVertex *inBuffer = verts;
 	struct MaggieTransVertex *outBuffer = tmpPoly1;
