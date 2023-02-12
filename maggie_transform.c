@@ -59,7 +59,7 @@ void TransformVertexBufferUP(struct MaggieTransVertex * restrict dst, struct Mag
 void magSetPerspective(REG(a0, float *matrix), REG(a6, MaggieBase *lib))
 {
 	memcpy(&lib->perspective, matrix, sizeof(mat4));
-	mat4_mul(&lib->modelviewProj, &lib->modelview, &lib->perspective);
+	mat4_mul(&lib->modelviewProj, &lib->perspective, &lib->modelview);
 }
 
 /*****************************************************************************/
@@ -67,7 +67,7 @@ void magSetPerspective(REG(a0, float *matrix), REG(a6, MaggieBase *lib))
 void magSetModelView(REG(a0, float *matrix), REG(a6, MaggieBase *lib))
 {
 	memcpy(&lib->modelview, matrix, sizeof(mat4));
-	mat4_mul(&lib->modelviewProj, &lib->modelview, &lib->perspective);
+	mat4_mul(&lib->modelviewProj, &lib->perspective, &lib->modelview);
 }
 
 /*****************************************************************************/

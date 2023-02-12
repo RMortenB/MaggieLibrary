@@ -48,8 +48,8 @@ int ComputeClipCodes(UBYTE *clipCodes, struct MaggieTransVertex *vtx, UWORD nVer
 
 /*****************************************************************************/
 
-float offsetScaleX = 320.0f;
-float offsetScaleY = 160.0f;
+static float offsetScaleX = 320.25f;
+static float offsetScaleY = 180.25f;
 
 /*****************************************************************************/
 
