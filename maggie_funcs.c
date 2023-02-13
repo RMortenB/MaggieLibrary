@@ -58,6 +58,7 @@ void magSetIndexBuffer(REG(d0, WORD iBuffer), REG(a6, MaggieBase *lib))
 }
 
 /*****************************************************************************/
+/*****************************************************************************/
 
 UWORD GetVBNumVerts(ULONG *mem)
 {
@@ -109,10 +110,10 @@ UWORD magAllocateVertexBuffer(REG(d0, UWORD nVerts), REG(a6, MaggieBase *lib))
 
 	if(vBuffer == ~0)
 		return ~0;
-
-	ULONG *mem = (ULONG *)AllocMem(sizeof(struct MaggieVertex) * nVerts + sizeof(struct MaggieTransVertex) * nVerts + sizeof(ULONG) * 2, MEMF_ANY | MEMF_CLEAR);
+	ULONG memSize = (sizeof(struct MaggieVertex) + sizeof(struct MaggieTransVertex) + sizeof(UBYTE)) * nVerts + sizeof(ULONG) * 2;
+	ULONG *mem = (ULONG *)AllocMem(memSize, MEMF_ANY | MEMF_CLEAR);
 	mem[0] = nVerts;
-	mem[1] = sizeof(struct MaggieVertex) * nVerts + sizeof(ULONG) * 2;
+	mem[1] = memSize;
 	lib->vertexBuffers[vBuffer] = mem;
 
 	return vBuffer;
@@ -126,18 +127,17 @@ void magUploadVertexBuffer(REG(d0, UWORD vBuffer), REG(a0, struct MaggieVertex *
 	if(!mem)
 		return;
 
-	if(nVerts > GetVBNumVerts(mem))
-		nVerts = GetVBNumVerts(mem);
 	if(startVtx + nVerts > GetVBNumVerts(mem))
 	{
 		nVerts = GetVBNumVerts(mem) - startVtx;
 	}
 
-	struct MaggieVertex *dst = (struct MaggieVertex *)&mem[2];
+	struct MaggieVertex *dst = GetVBVertices(mem);
 	for(int i = 0; i < nVerts; ++i)
 	{
-		dst[i] = vtx[startVtx + i];
+		dst[i + startVtx] = vtx[startVtx + i];
 	}
+	PrepareVertexBuffer(&dst[startVtx], nVerts);
 }
 
 /*****************************************************************************/
@@ -167,6 +167,8 @@ UWORD GetIBNumIndices(ULONG *mem)
 {
 	return mem[0];
 }
+
+/*****************************************************************************/
 
 UWORD *GetIBIndices(ULONG *mem)
 {
@@ -213,9 +215,6 @@ void magUploadIndexBuffer(REG(d0, UWORD iBuffer), REG(a0, UWORD *indx), REG(d1, 
 	ULONG *mem = lib->indexBuffers[iBuffer];
 	if(!mem)
 		return;
-
-	if(nIndx > mem[0])
-		nIndx = mem[0];
 
 	if(startIndx + nIndx > mem[0])
 	{
