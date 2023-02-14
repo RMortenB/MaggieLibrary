@@ -408,7 +408,13 @@ void magDrawIndexedPolygonsUP(REG(a0, struct MaggieVertex *vtx), REG(d0, UWORD n
 
 void FlushImmediateMode(MaggieBase *lib)
 {
-//	magDrawTriangles();
+	if(lib->immModeVtx == 0xffff)
+		return;
+	if(lib->nIModeVtx >= 3)
+	{
+		struct MaggieVertex *vtx = GetVBVertices(lib->vertexBuffers[lib->immModeVtx]);
+		magDrawTrianglesUP(vtx, lib->nIModeVtx, lib);
+	}
 	lib->nIModeVtx = 0;
 }
 

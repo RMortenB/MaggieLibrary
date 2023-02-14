@@ -403,9 +403,6 @@ void magBegin(REG(a6, MaggieBase *lib))
 	{
 		lib->immModeVtx = magAllocateVertexBuffer(IMM_MODE_MAGGIE_VERTS, lib);
 	}
-	struct GfxBase *GfxBase = lib->gfxBase;
-	OwnBlitter();
-	WaitBlit();
 }
 
 /*****************************************************************************/
@@ -416,32 +413,27 @@ void magEnd(REG(a6, MaggieBase *lib))
 	{
 		FlushImmediateMode(lib);
 	}
-	struct GfxBase *GfxBase = lib->gfxBase;
-	DisownBlitter();
 }
 
 /*****************************************************************************/
 
-void magVertex(REG(fp0, float x), REG(fp1, float y), REG(fp2, float z), REG(fp3, float w), REG(a6, MaggieBase *lib))
+void magVertex(REG(fp0, float x), REG(fp1, float y), REG(fp2, float z), REG(a6, MaggieBase *lib))
 {
-	if(lib->nIModeVtx == IMM_MODE_MAGGIE_VERTS)
+	if(lib->nIModeVtx >= IMM_MODE_MAGGIE_VERTS)
 	{
 		FlushImmediateMode(lib);
 	}
 	if(lib->immModeVtx == 0xffff)
 		return;
-	struct MaggieVertex *vtx = (struct MaggieVertex *)&(lib->vertexBuffers[lib->immModeVtx][2]);
-	vtx[lib->nIModeVtx].pos.x = x;
-	vtx[lib->nIModeVtx].pos.y = y;
-	vtx[lib->nIModeVtx].pos.z = z;
+	struct MaggieVertex *vtx = GetVBVertices(lib->vertexBuffers[lib->immModeVtx]) + lib->nIModeVtx;
+	vtx->pos.x = x;
+	vtx->pos.y = y;
+	vtx->pos.z = z;
 	for(int i = 0; i < MAGGIE_MAX_TEXCOORDS; ++i)
 	{
-		vtx[lib->nIModeVtx].tex[i].u = 0.0f;
-		vtx[lib->nIModeVtx].tex[i].v = 0.0f;
-		vtx[lib->nIModeVtx].tex[i].w = 1.0f;
+		vtx->tex[i] = lib->ImmVtx.tex[i];
 	}
-	vtx[lib->nIModeVtx].rgba = ~0;
-
+	vtx->rgba = lib->ImmVtx.rgba;
 	lib->nIModeVtx++;
 }
 
@@ -449,27 +441,25 @@ void magVertex(REG(fp0, float x), REG(fp1, float y), REG(fp2, float z), REG(fp3,
 
 void magTexCoord(REG(d0, UWORD texReg), REG(fp0, float u), REG(fp1, float v), REG(a6, MaggieBase *lib))
 {
-	struct MaggieVertex *vtx = (struct MaggieVertex *)&(lib->vertexBuffers[lib->immModeVtx][2]);
-	vtx->tex[texReg].u = u * 256.0f * 65536.0f;
-	vtx->tex[texReg].v = v * 256.0f * 65536.0f;
+	lib->ImmVtx.tex[texReg].u = u;
+	lib->ImmVtx.tex[texReg].v = v;
+	lib->ImmVtx.tex[texReg].w = 1.0f;
 }
 
 /*****************************************************************************/
 
 void magTexCoord3(REG(d0, UWORD texReg), REG(fp0, float u), REG(fp1, float v), REG(fp2, float w), REG(a6, MaggieBase *lib))
 {
-	struct MaggieVertex *vtx = (struct MaggieVertex *)&(lib->vertexBuffers[lib->immModeVtx][2]);
-	vtx[lib->nIModeVtx].tex[texReg].u = u * 256.0f * 65536.0f;
-	vtx[lib->nIModeVtx].tex[texReg].v = v * 256.0f * 65536.0f;
-	vtx[lib->nIModeVtx].tex[texReg].w = w;
+	lib->ImmVtx.tex[texReg].u = u;
+	lib->ImmVtx.tex[texReg].v = v;
+	lib->ImmVtx.tex[texReg].w = w;
 }
 
 /*****************************************************************************/
 
 void magColour(REG(d0, ULONG col), REG(a6, MaggieBase *lib))
 {
-	struct MaggieVertex *vtx = (struct MaggieVertex *)&(lib->vertexBuffers[lib->immModeVtx][2]);
-	vtx[lib->nIModeVtx].rgba = (col & 0xff00) | ((col >> 8) & 0xff);
+	lib->ImmVtx.rgba = (col & 0xff00) | ((col >> 8) & 0xff);
 }
 
 /*****************************************************************************/

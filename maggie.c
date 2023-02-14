@@ -148,6 +148,7 @@ static APTR maggieInit(int segList __asm("a0"), MaggieBase *lib __asm("d0"), str
 	InitSemaphore(&lib->lock);
 
 	lib->immModeVtx = 0xffff;
+	lib->nIModeVtx = 0;
 
 	for(int i = 0; i < MAX_VERTEX_BUFFERS; ++i)
 	{
