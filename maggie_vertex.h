@@ -27,6 +27,7 @@ struct MaggieTexCoord
 struct MaggieVertex
 {
 	vec3 pos;
+	vec3 normal;
 	struct MaggieTexCoord tex[MAGGIE_MAX_TEXCOORDS];
 	ULONG rgba;
 };
@@ -38,15 +39,6 @@ struct MaggieTransVertex
 	vec4 pos;
 	struct MaggieTexCoord tex[MAGGIE_MAX_TEXCOORDS];
 	ULONG rgba;
-};
-
-/*****************************************************************************/
-
-struct MaggieClippedVertex
-{
-	float xow, yow, zow, oow;
-	ULONG uow, vow;
-	ULONG cow;
 };
 
 /*****************************************************************************/

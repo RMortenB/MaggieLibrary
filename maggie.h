@@ -93,6 +93,7 @@ void magBegin();
 void magEnd();
 
 void magVertex(float x, float y, float z);
+void magNormal(float x, float y, float z);
 void magTexCoord(int texReg, float u, float v);
 void magTexCoord3(int texReg, float u, float v, float w);
 void magColour(ULONG col);

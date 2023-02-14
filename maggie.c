@@ -118,6 +118,7 @@ static APTR functionTable[] =
 	magBegin,
 	magEnd,
 	magVertex,
+	magNormal,
 	magTexCoord,
 	magTexCoord3,
 	magColour,

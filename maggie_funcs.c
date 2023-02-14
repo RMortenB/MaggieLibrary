@@ -429,6 +429,7 @@ void magVertex(REG(fp0, float x), REG(fp1, float y), REG(fp2, float z), REG(a6, 
 	vtx->pos.x = x;
 	vtx->pos.y = y;
 	vtx->pos.z = z;
+	vtx->normal = lib->ImmVtx.normal;
 	for(int i = 0; i < MAGGIE_MAX_TEXCOORDS; ++i)
 	{
 		vtx->tex[i] = lib->ImmVtx.tex[i];
@@ -436,6 +437,16 @@ void magVertex(REG(fp0, float x), REG(fp1, float y), REG(fp2, float z), REG(a6, 
 	vtx->rgba = lib->ImmVtx.rgba;
 	lib->nIModeVtx++;
 }
+
+/*****************************************************************************/
+
+void magNormal(REG(fp0, float x), REG(fp1, float y), REG(fp2, float z), REG(a6, MaggieBase *lib))
+{
+	lib->ImmVtx.normal.x = x;
+	lib->ImmVtx.normal.x = y;
+	lib->ImmVtx.normal.x = z;
+}
+
 
 /*****************************************************************************/
 

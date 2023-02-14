@@ -45,6 +45,7 @@ magBegin()()
 magEnd()()
 *
 magVertex(x,y,z)(fp0,fp1,fp2)
+magNormal(x,y,z)(fp0,fp1,fp2)
 magTexCoord(texReg,u,v)(d0,fp0,fp1)
 magTexCoord3(texReg,u,v,w)(d0,fp0,fp1,fp2)
 magColour(col)(d0)
