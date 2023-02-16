@@ -15,7 +15,7 @@ SOURCES=maggie.c \
 
 ASFLAGS=-m68080 -m68882 -quiet -Fhunk
 
-CFLAGS=-std=c99 -Ofast -fomit-frame-pointer -m68080 -Wall -Wno-unused-function -Wno-unused-variable
+CFLAGS=-std=c99 -Ofast -fomit-frame-pointer -m68080 -Wall -Wno-unused-function -Wno-unused-variable -I include
 
 LFLAGS=-nostartfiles 
 LDLIBS=
