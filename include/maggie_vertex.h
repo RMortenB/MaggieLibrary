@@ -29,7 +29,7 @@ struct MaggieVertex
 	vec3 pos;
 	vec3 normal;
 	struct MaggieTexCoord tex[MAGGIE_MAX_TEXCOORDS];
-	ULONG rgba;
+	ULONG colour;
 };
 
 /*****************************************************************************/
@@ -38,7 +38,7 @@ struct MaggieTransVertex
 {
 	vec4 pos;
 	struct MaggieTexCoord tex[MAGGIE_MAX_TEXCOORDS];
-	ULONG rgba;
+	ULONG colour;
 };
 
 /*****************************************************************************/

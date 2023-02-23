@@ -70,7 +70,7 @@ void NormaliseVertexBuffer(struct MaggieTransVertex *vtx, int nVerts, UBYTE *cli
 			vtx[i].tex[j].u = vtx[i].tex[j].u * oow;
 			vtx[i].tex[j].v = vtx[i].tex[j].v * oow;
 		}
-		vtx[i].rgba = vtx[i].rgba;
+		vtx[i].colour = vtx[i].colour;
 	}
 }
 
@@ -91,7 +91,7 @@ void NormaliseClippedVertexBuffer(struct MaggieTransVertex *vtx, int nVerts)
 			vtx[i].tex[j].u = vtx[i].tex[j].u * oow;
 			vtx[i].tex[j].v = vtx[i].tex[j].v * oow;
 		}
-		vtx[i].rgba = vtx[i].rgba;
+		vtx[i].colour = vtx[i].colour;
 	}
 }
 

@@ -9,8 +9,9 @@ magSetRGB(rgb)(d0)
 *
 magGetDepthBuffer()()
 *
-magSetPerspective(matrix)(a0)
-magSetModelView(matrix)(a0)
+magSetWorldMatrix(matrix)(a0)
+magSetViewMatrix(matrix)(a0)
+magSetPerspectiveMatrix(matrix)(a0)
 *
 magDrawTrianglesUP(vtx,nVerts)(a0,d0)
 magDrawIndexedTrianglesUP(vtx,nVtx,indx,nIndx)(a0,d0,a1,d1)
@@ -51,5 +52,12 @@ magTexCoord3(texReg,u,v,w)(d0,fp0,fp1,fp2)
 magColour(col)(d0)
 *
 magClear(buffers)(d0)
+*
+magSetLightType(light,colour)(d0,d1)
+magSetLightPosition(light,x,y,z)(d0,fp0,fp1,fp2)
+magSetLightDirection(light,x,y,z)(d0,fp0,fp1,fp2)
+magSetLightCone(light,phi)(d0,fp0)
+magSetLightAttenuation(light,attenuation)(d0,fp0)
+magSetLightColour(light,colour)(d0,d1)
 *
 ##end

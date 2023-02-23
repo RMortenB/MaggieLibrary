@@ -434,7 +434,7 @@ void magVertex(REG(fp0, float x), REG(fp1, float y), REG(fp2, float z), REG(a6, 
 	{
 		vtx->tex[i] = lib->ImmVtx.tex[i];
 	}
-	vtx->rgba = lib->ImmVtx.rgba;
+	vtx->colour = lib->ImmVtx.colour;
 	lib->nIModeVtx++;
 }
 
@@ -470,7 +470,7 @@ void magTexCoord3(REG(d0, UWORD texReg), REG(fp0, float u), REG(fp1, float v), R
 
 void magColour(REG(d0, ULONG col), REG(a6, MaggieBase *lib))
 {
-	lib->ImmVtx.rgba = (col & 0xff00) | ((col >> 8) & 0xff);
+	lib->ImmVtx.colour = col;
 }
 
 /*****************************************************************************/

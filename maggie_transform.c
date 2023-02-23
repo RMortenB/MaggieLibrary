@@ -16,7 +16,7 @@ void TransformVertexBuffer(struct MaggieTransVertex *dstVtx, struct MaggieVertex
 			dstVtx[i].tex[j].v = vtx[i].tex[j].v;
 			dstVtx[i].tex[j].w = vtx[i].tex[j].w;
 		}
-		dstVtx[i].rgba = vtx[i].rgba;
+		dstVtx[i].colour = vtx[i].colour;
 	}
 }
 
@@ -32,7 +32,7 @@ void PrepareVertexBuffer(struct MaggieVertex *vtx, UWORD nVerts)
 			vtx[i].tex[j].v = vtx[i].tex[j].v * 256.0f * 65536.0f;
 			vtx[i].tex[j].w = vtx[i].tex[j].w;
 		}
-		vtx[i].rgba = ((vtx[i].rgba >> 8) & 0xff) * 0x101;
+		vtx[i].colour = RGBToGrayScale(vtx[i].colour) * 256.0f;
 	}
 }
 
@@ -49,26 +49,39 @@ void TransformVertexBufferUP(struct MaggieTransVertex * restrict dst, struct Mag
 			dst[i].tex[j].v = src[i].tex[j].v * 256.0f * 65536.0f;
 			dst[i].tex[j].w = src[i].tex[j].w;
 		}
-		dst[i].rgba = ((src[i].rgba >> 8) & 0xff) * 0x101;
+		dst[i].colour = RGBToGrayScale(src[i].colour) * 256.0f;
 	}
 }
 
 /*****************************************************************************/
 
 // These are reset on EndDraw.
-void magSetPerspective(REG(a0, float *matrix), REG(a6, MaggieBase *lib))
+
+void magSetWorldMatrix(REG(a0, float *matrix), REG(a6, MaggieBase *lib))
 {
-	memcpy(&lib->perspective, matrix, sizeof(mat4));
-	mat4_mul(&lib->modelviewProj, &lib->perspective, &lib->modelview);
+	memcpy(&lib->worldMatrix, matrix, sizeof(mat4));
+	mat4_mul(&lib->modelviewProj, &lib->viewMatrix, &lib->worldMatrix);
+	mat4_mul(&lib->modelviewProj, &lib->perspectiveMatrix, &lib->modelviewProj);
 }
 
 /*****************************************************************************/
 
-void magSetModelView(REG(a0, float *matrix), REG(a6, MaggieBase *lib))
+void magSetViewMatrix(REG(a0, float *matrix), REG(a6, MaggieBase *lib))
 {
-	memcpy(&lib->modelview, matrix, sizeof(mat4));
-	mat4_mul(&lib->modelviewProj, &lib->perspective, &lib->modelview);
+	memcpy(&lib->viewMatrix, matrix, sizeof(mat4));
+	mat4_mul(&lib->modelviewProj, &lib->viewMatrix, &lib->worldMatrix);
+	mat4_mul(&lib->modelviewProj, &lib->perspectiveMatrix, &lib->modelviewProj);
 }
 
 /*****************************************************************************/
+
+void magSetPerspectiveMatrix(REG(a0, float *matrix), REG(a6, MaggieBase *lib))
+{
+	memcpy(&lib->perspectiveMatrix, matrix, sizeof(mat4));
+	mat4_mul(&lib->modelviewProj, &lib->viewMatrix, &lib->worldMatrix);
+	mat4_mul(&lib->modelviewProj, &lib->perspectiveMatrix, &lib->modelviewProj);
+}
+
+/*****************************************************************************/
+
 

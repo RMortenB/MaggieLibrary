@@ -45,6 +45,18 @@ typedef struct
 
 /*****************************************************************************/
 
+typedef struct
+{
+	int type;
+	vec3 pos;
+	vec3 dir;
+	ULONG colour;
+	float attenuation;
+	float phi;
+} magLight;
+
+/*****************************************************************************/
+
 struct MaggieBase;
 typedef struct MaggieBase MaggieBase;
 
@@ -85,8 +97,9 @@ struct MaggieBase
 
 	/*******************/
 
-	mat4 perspective;
-	mat4 modelview;
+	mat4 worldMatrix;
+	mat4 viewMatrix;
+	mat4 perspectiveMatrix;
 	mat4 modelviewProj;
 
 	/*******************/
@@ -110,6 +123,12 @@ struct MaggieBase
 	ULONG *vertexBuffers[MAX_VERTEX_BUFFERS];
 	ULONG *indexBuffers[MAX_INDEX_BUFFERS];
 	ULONG *textures[MAX_TEXTURES];
+
+	/*******************/
+
+	magLight lights[MAG_MAX_LIGHTS];
+
+	/*******************/
 
 	magEdgePos magLeftEdge[MAGGIE_MAX_YRES];
 	magEdgePos magRightEdge[MAGGIE_MAX_YRES];
@@ -163,8 +182,9 @@ UWORD *magGetDepthBuffer(REG(a6, MaggieBase *lib)); // This is the live depth bu
 /*****************************************************************************/
 
 // These are reset on EndDraw.
-void magSetPerspective(REG(a0, float *matrix), REG(a6, MaggieBase *lib));
-void magSetModelView(REG(a0, float *matrix), REG(a6, MaggieBase *lib));
+void magSetWorldMatrix(REG(a0, float *matrix), REG(a6, MaggieBase *lib));
+void magSetViewMatrix(REG(a0, float *matrix), REG(a6, MaggieBase *lib));
+void magSetPerspectiveMatrix(REG(a0, float *matrix), REG(a6, MaggieBase *lib));
 
 /*****************************************************************************/
 
@@ -243,6 +263,15 @@ void magColour(REG(d0, ULONG col), REG(a6, MaggieBase *lib));
 void magClear(REG(d0, UWORD buffers), REG(a6, MaggieBase *lib));
 
 /*****************************************************************************/
+
+void magSetLightType(REG(d0, UWORD light), REG(d1, UWORD type), REG(a6, MaggieBase *lib));
+void magSetLightPosition(REG(d0, UWORD light), REG(fp0, float x), REG(fp1, float y), REG(fp2, float z), REG(a6, MaggieBase *lib));
+void magSetLightDirection(REG(d0, UWORD light), REG(fp0, float x), REG(fp1, float y), REG(fp2, float z), REG(a6, MaggieBase *lib));
+void magSetLightCone(REG(d0, UWORD light), REG(fp0, float phi), REG(a6, MaggieBase *lib));
+void magSetLightAttenuation(REG(d0, UWORD light), REG(fp0, float attenuation), REG(a6, MaggieBase *lib));
+void magSetLightColour(REG(d0, UWORD light), REG(d1, ULONG colour), REG(a6, MaggieBase *lib));
+
+/*****************************************************************************/
 // Private functions
 
 ULONG GetTextureMipMapSize(UWORD texSize);
@@ -255,6 +284,10 @@ APTR GetTextureData(ULONG *mem);
 void TransformVertexBufferUP(struct MaggieTransVertex * restrict dst, struct MaggieVertex * restrict src, UWORD nVerts, MaggieBase *lib);
 void PrepareVertexBuffer(struct MaggieVertex *vtx, UWORD nVerts);
 void TransformVertexBuffer(struct MaggieTransVertex *dstVtx, struct MaggieVertex *vtx, UWORD nVerts, MaggieBase *lib);
+
+/*****************************************************************************/
+
+ULONG RGBToGrayScale(ULONG rgb);
 
 /*****************************************************************************/
 

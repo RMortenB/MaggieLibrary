@@ -92,8 +92,9 @@ static APTR functionTable[] =
 	magSetDrawMode,
 	magSetRGB,
 	magGetDepthBuffer,
-	magSetPerspective,
-	magSetModelView,
+	magSetWorldMatrix,
+	magSetViewMatrix,
+	magSetPerspectiveMatrix,
 	magDrawTrianglesUP,
 	magDrawIndexedTrianglesUP,
 	magDrawIndexedPolygonsUP,
@@ -123,6 +124,12 @@ static APTR functionTable[] =
 	magTexCoord3,
 	magColour,
 	magClear,
+	magSetLightType,
+	magSetLightPosition,
+	magSetLightDirection,
+	magSetLightCone,
+	magSetLightAttenuation,
+	magSetLightColour,
 	(APTR)-1
 };
 
@@ -164,8 +171,9 @@ static APTR maggieInit(int segList __asm("a0"), MaggieBase *lib __asm("d0"), str
 		lib->textures[i] = NULL;
 	}
 
-	mat4_identity(&lib->perspective);
-	mat4_identity(&lib->modelview);
+	mat4_identity(&lib->worldMatrix);
+	mat4_identity(&lib->viewMatrix);
+	mat4_identity(&lib->perspectiveMatrix);
 	mat4_identity(&lib->modelviewProj);
 
 	return lib;

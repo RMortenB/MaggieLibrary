@@ -9,7 +9,6 @@ struct SpanPosition;
 
 void __magDummy(); // Duff prototype.. Not a function.
 
-
 void magSetScreenMemory(APTR *pixels, UWORD xres, UWORD yres);
 void magSetTexture(UWORD unit, UWORD txtr);
 void magSetDrawMode(UWORD mode);
@@ -23,8 +22,9 @@ UWORD *magGetDepthBuffer(); // This is the live depth buffer!
 /*****************************************************************************/
 
 // These are reset on EndDraw.
-void magSetPerspective(float *matrix);
-void magSetModelView(float *matrix);
+void magSetWorldMatrix(float *matrix);
+void magSetViewMatrix(float *matrix);
+void magSetPerspectiveMatrix(float *matrix);
 
 /*****************************************************************************/
 
@@ -101,6 +101,15 @@ void magColour(ULONG col);
 /*****************************************************************************/
 
 void magClear(UWORD buffers);
+
+/*****************************************************************************/
+
+void magSetLightType(UWORD light, UWORD type);
+void magSetLightPosition(UWORD light, float x, float y, float z);
+void magSetLightDirection(UWORD light, float x, float y, float z);
+void magSetLightCone(UWORD light, float phi);
+void magSetLightAttenuation(UWORD light, float attenuation);
+void magSetLightColour(UWORD light, ULONG colour);
 
 /*****************************************************************************/
 

@@ -28,7 +28,7 @@ void DrawLine(magEdgePos * restrict edge, int tex, const struct MaggieTransVerte
 	float wLen = v1->pos.w - v0->pos.w;
 	float uLen = v1->tex[tex].u - v0->tex[tex].u;
 	float vLen = v1->tex[tex].v - v0->tex[tex].v;
-	float iLen = v1->rgba - v0->rgba;
+	float iLen = v1->colour - v0->colour;
 
 	float preRatio0 = preStep0 / yLen;
 	float preRatio1 = preStep1 / yLen;
@@ -52,7 +52,7 @@ void DrawLine(magEdgePos * restrict edge, int tex, const struct MaggieTransVerte
 	float zow = v0->pos.z + preStep0 * zDDA;
 	float uow = v0->tex[tex].u + preStep0 * uDDA;
 	float vow = v0->tex[tex].v + preStep0 * vDDA;
-	float iow = v0->rgba + preStep0 * iDDA;
+	float iow = v0->colour + preStep0 * iDDA;
 
 	for(int i = 0; i < lineLen; ++i)
 	{
