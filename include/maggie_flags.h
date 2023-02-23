@@ -9,7 +9,6 @@
 #define MAG_DRAWMODE_32BIT			0x0004
 
 /*****************************************************************************/
-/*****************************************************************************/
 
 #define MAG_DRAWMODE_BLEND_DISABLE	0x0000
 #define MAG_DRAWMODE_BLEND_ADD		0x0008
@@ -19,6 +18,16 @@
 
 #define MAG_CLEAR_COLOUR 0x0001
 #define MAG_CLEAR_DEPTH 0x0002
+
+/*****************************************************************************/
+
+#define MAG_MAX_LIGHTS			8
+
+#define MAG_LIGHT_OFF			0x0000
+#define MAG_LIGHT_POINT			0x0001
+#define MAG_LIGHT_DIRECTIONAL	0x0002
+#define MAG_LIGHT_SPOT			0x0003
+#define MAG_LIGHT_AMBIENT		0x0004
 
 /*****************************************************************************/
 
