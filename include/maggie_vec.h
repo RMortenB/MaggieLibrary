@@ -31,6 +31,35 @@ typedef struct mat4
 
 /*****************************************************************************/
 
+static inline float mag_rsqrtf(float num)
+{
+        const float threehalfs = 1.5F;
+        union
+        {
+                int i;
+                float f;
+        } val;
+
+        float x2 = num * 0.5F;
+        val.f = num;
+        val.i  = 0x5f3759df - (val.i >> 1);
+        num  = val.f;
+        num  = num * (threehalfs - (x2 * num * num));   // 1st iteration
+        num  = num * (threehalfs - (x2 * num * num));   // 2nd iteration
+        num  = num * (threehalfs - (x2 * num * num));   // 3rd iteration
+
+        return num;
+}
+
+/*****************************************************************************/
+
+static inline float mag_sqrtf(float num)
+{
+        return mag_rsqrtf(num) * num;
+}
+
+/*****************************************************************************/
+
 static inline void vec3_set(vec3 *res, float x, float y, float z)
 {
 	res->x = x;
@@ -85,7 +114,7 @@ static inline void vec3_scale(vec3 *res, const vec3 *v, float f)
 
 static inline float vec3_len(const vec3 *v)
 {
-	return sqrtf(vec3_dot(v, v));
+	return mag_sqrtf(vec3_dot(v, v));
 }
 
 /*****************************************************************************/

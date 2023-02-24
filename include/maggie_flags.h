@@ -7,6 +7,7 @@
 #define MAG_DRAWMODE_DEPTHBUFFER	0x0001
 #define MAG_DRAWMODE_BILINEAR		0x0002
 #define MAG_DRAWMODE_32BIT			0x0004
+#define MAG_DRAWMODE_LIGHTING		0x0002
 
 /*****************************************************************************/
 

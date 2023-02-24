@@ -17,7 +17,7 @@ static void LerpVertex(struct MaggieTransVertex *res, const struct MaggieTransVe
 		res->tex[i].v = (v1->tex[i].v - v0->tex[i].v) * t + v0->tex[i].v;
 		res->tex[i].w = (v1->tex[i].w - v0->tex[i].w) * t + v0->tex[i].w;
 	}
-	res->colour = (v1->colour - v0->colour) * t + v0->colour;
+	res->colour = ((int)v1->colour - (int)v0->colour) * t + (int)v0->colour;
 }
 
 /*****************************************************************************/

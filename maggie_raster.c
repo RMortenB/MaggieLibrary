@@ -48,11 +48,11 @@ static void DrawHardwareSpanZBuffered(	APTR dest,
 										ULONG ZZzz,
 										ULONG UUuu,
 										ULONG VVvv,
-										LONG Ii,
+										UWORD Ii,
 										LONG dZZzz,
 										ULONG dUUuu,
 										ULONG dVVvv,
-										LONG dIi)
+										UWORD dIi)
 {
 	maggieRegs->depthDest = zDest;
 	maggieRegs->depthStart = ZZzz;
@@ -102,7 +102,7 @@ static void DrawSpanZBuffer32(ULONG *destCol, UWORD *zBuffer, int len, ULONG Zz,
 			if(ti > 255)
 				ti = 255;
 			*zBuffer = z;
-			*destCol = ti * 0x010101;
+			*destCol = (ti >> 8) * 0x010101;
 		}
 		destCol++;
 		zBuffer++;
@@ -176,13 +176,16 @@ void DrawSpansHW32(ULONG * restrict pixels, UWORD * restrict zbuffer, const magE
 		LONG uStart = uPos * w;
 		LONG vStart = vPos * w;
 		float zStart = zPos;
-		int iStart = iPos;
+		float iStart = iPos;
 //		int nRuns = len / PIXEL_RUN;
 		float ooLen = 1.0f / PIXEL_RUN;
 
 		int runLength = PIXEL_RUN;
 		if(runLength > len)
+		{
 			runLength = len;
+		}
+
 		while(len > 0)
 		{
 			wPos += wDDA;
@@ -199,15 +202,15 @@ void DrawSpansHW32(ULONG * restrict pixels, UWORD * restrict zbuffer, const magE
 			LONG uEnd = uPos * w;
 			LONG vEnd = vPos * w;
 
-			LONG dUUuu = (LONG)((uEnd - uStart) * ooLen);
-			LONG dVVvv = (LONG)((vEnd - vStart) * ooLen);
-			LONG dZz = (LONG)((zEnd - zStart) * ooLen);
-			LONG dIi = (LONG)((iEnd - iStart) * ooLen);
-
 			if(len <= (PIXEL_RUN * 3 / 2))
 			{
 				runLength = len;
 			}
+
+			LONG dUUuu = (LONG)((uEnd - uStart) * ooLen);
+			LONG dVVvv = (LONG)((vEnd - vStart) * ooLen);
+			LONG dZz = (LONG)((zEnd - zStart) * ooLen);
+			LONG dIi = (LONG)((iEnd - iStart) * ooLen);
 
 			DrawHardwareSpanZBuffered(dstColPtr, dstZPtr, runLength, (ULONG)zStart, uStart, vStart, (LONG)iStart, dZz, dUUuu, dVVvv, dIi);
 
@@ -286,7 +289,7 @@ void DrawSpansHW16(UWORD * restrict pixels, UWORD * restrict zbuffer, const magE
 		LONG uStart = uPos * w;
 		LONG vStart = vPos * w;
 		float zStart = zPos;
-		int iStart = iPos;
+		float iStart = iPos;
 //		int nRuns = len / PIXEL_RUN;
 		float ooLen = 1.0f / PIXEL_RUN;
 
@@ -309,15 +312,15 @@ void DrawSpansHW16(UWORD * restrict pixels, UWORD * restrict zbuffer, const magE
 			LONG uEnd = uPos * w;
 			LONG vEnd = vPos * w;
 
-			LONG dUUuu = (LONG)((uEnd - uStart) * ooLen);
-			LONG dVVvv = (LONG)((vEnd - vStart) * ooLen);
-			LONG dZz = (LONG)((zEnd - zStart) * ooLen);
-			LONG dIi = (LONG)((iEnd - iStart) * ooLen);
-
 			if(len <= (PIXEL_RUN * 3 / 2))
 			{
 				runLength = len;
 			}
+
+			LONG dUUuu = (LONG)((uEnd - uStart) * ooLen);
+			LONG dVVvv = (LONG)((vEnd - vStart) * ooLen);
+			LONG dZz = (LONG)((zEnd - zStart) * ooLen);
+			LONG dIi = (LONG)((iEnd - iStart) * ooLen);
 
 			DrawHardwareSpanZBuffered(dstColPtr, dstZPtr, runLength, (ULONG)zStart, uStart, vStart, (LONG)iStart, dZz, dUUuu, dVVvv, dIi);
 

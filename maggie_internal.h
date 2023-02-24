@@ -317,4 +317,10 @@ void FlushImmediateMode(MaggieBase *lib);
 
 int ClipPolygon(struct MaggieTransVertex *verts, int nVerts);
 
+/*****************************************************************************/
+
+void LightBuffer(MaggieBase *lib, struct MaggieTransVertex *dest, struct MaggieVertex *src, int nVerts);
+
+/*****************************************************************************/
+
 #endif // MAGGIE_INTERNAL_H_INCLUDED

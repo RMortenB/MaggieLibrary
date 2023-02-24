@@ -170,6 +170,10 @@ static APTR maggieInit(int segList __asm("a0"), MaggieBase *lib __asm("d0"), str
 	{
 		lib->textures[i] = NULL;
 	}
+	for(int i = 0; i < MAG_MAX_LIGHTS; ++i)
+	{
+		lib->lights[i].type = MAG_LIGHT_OFF;
+	}
 
 	mat4_identity(&lib->worldMatrix);
 	mat4_identity(&lib->viewMatrix);

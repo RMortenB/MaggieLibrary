@@ -32,7 +32,7 @@ void PrepareVertexBuffer(struct MaggieVertex *vtx, UWORD nVerts)
 			vtx[i].tex[j].v = vtx[i].tex[j].v * 256.0f * 65536.0f;
 			vtx[i].tex[j].w = vtx[i].tex[j].w;
 		}
-		vtx[i].colour = RGBToGrayScale(vtx[i].colour) * 256.0f;
+		vtx[i].colour = RGBToGrayScale(vtx[i].colour);
 	}
 }
 
@@ -49,7 +49,7 @@ void TransformVertexBufferUP(struct MaggieTransVertex * restrict dst, struct Mag
 			dst[i].tex[j].v = src[i].tex[j].v * 256.0f * 65536.0f;
 			dst[i].tex[j].w = src[i].tex[j].w;
 		}
-		dst[i].colour = RGBToGrayScale(src[i].colour) * 256.0f;
+		dst[i].colour = RGBToGrayScale(src[i].colour);
 	}
 }
 
