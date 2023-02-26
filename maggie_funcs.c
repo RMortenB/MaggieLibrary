@@ -481,14 +481,14 @@ void magClear(REG(d0, UWORD buffers), REG(a6, MaggieBase *lib))
 	if(buffers & MAG_CLEAR_COLOUR)
 	{
 		int size = (lib->drawMode & MAG_DRAWMODE_32BIT) ? lib->xres * lib->yres * 4 : lib->xres * lib->yres * 2;
-		memset(lib->screen, 0, size);
+		magFastClear(lib->screen, size, 0);
 	}
 	if(buffers & MAG_CLEAR_DEPTH)
 	{
 		if(lib->depthBuffer)
 		{
 			int size = lib->xres * lib->yres * 2;
-			memset(lib->depthBuffer, 0xff, size);
+			magFastClear(lib->depthBuffer, size, ~0);
 		}
 	}
 }

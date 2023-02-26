@@ -13,6 +13,7 @@ SOURCES=maggie.c \
 		maggie_raster.c \
 		maggie_lighting.c \
 		maggie_debug.c \
+		maggie_buffers.s
 
 ASFLAGS=-m68080 -m68882 -quiet -Fhunk
 

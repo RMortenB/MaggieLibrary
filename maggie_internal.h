@@ -101,6 +101,7 @@ struct MaggieBase
 	mat4 viewMatrix;
 	mat4 perspectiveMatrix;
 	mat4 modelviewProj;
+	int dirtyMatrix;
 
 	/*******************/
 
@@ -320,6 +321,11 @@ int ClipPolygon(struct MaggieTransVertex *verts, int nVerts);
 /*****************************************************************************/
 
 void LightBuffer(MaggieBase *lib, struct MaggieTransVertex *dest, struct MaggieVertex *src, int nVerts);
+
+/*****************************************************************************/
+// Asm functions
+
+void magFastClear(void *buffer __asm("a0"), ULONG nBytes __asm("d0"), ULONG data __asm("d1"));
 
 /*****************************************************************************/
 
