@@ -425,16 +425,17 @@ void magVertex(REG(fp0, float x), REG(fp1, float y), REG(fp2, float z), REG(a6, 
 	}
 	if(lib->immModeVtx == 0xffff)
 		return;
-	struct MaggieVertex *vtx = GetVBVertices(lib->vertexBuffers[lib->immModeVtx]) + lib->nIModeVtx;
-	vtx->pos.x = x;
-	vtx->pos.y = y;
-	vtx->pos.z = z;
-	vtx->normal = lib->ImmVtx.normal;
+	struct MaggieVertex *vtx = GetVBVertices(lib->vertexBuffers[lib->immModeVtx]);
+	vtx[lib->nIModeVtx].pos.x = x;
+	vtx[lib->nIModeVtx].pos.y = y;
+	vtx[lib->nIModeVtx].pos.z = z;
+	vtx[lib->nIModeVtx].normal = lib->ImmVtx.normal;
 	for(int i = 0; i < MAGGIE_MAX_TEXCOORDS; ++i)
 	{
-		vtx->tex[i] = lib->ImmVtx.tex[i];
+		vtx[lib->nIModeVtx].tex[i].u = lib->ImmVtx.tex[i].u * 256.0f * 65536.0f;
+		vtx[lib->nIModeVtx].tex[i].v = lib->ImmVtx.tex[i].v * 256.0f * 65536.0f;
 	}
-	vtx->colour = lib->ImmVtx.colour;
+	vtx[lib->nIModeVtx].colour = RGBToGrayScale(lib->ImmVtx.colour);
 	lib->nIModeVtx++;
 }
 
@@ -443,10 +444,9 @@ void magVertex(REG(fp0, float x), REG(fp1, float y), REG(fp2, float z), REG(a6, 
 void magNormal(REG(fp0, float x), REG(fp1, float y), REG(fp2, float z), REG(a6, MaggieBase *lib))
 {
 	lib->ImmVtx.normal.x = x;
-	lib->ImmVtx.normal.x = y;
-	lib->ImmVtx.normal.x = z;
+	lib->ImmVtx.normal.y = y;
+	lib->ImmVtx.normal.z = z;
 }
-
 
 /*****************************************************************************/
 

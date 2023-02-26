@@ -104,7 +104,7 @@ void LightBuffer(MaggieBase *lib, struct MaggieTransVertex *dest, struct MaggieV
 					if(lambert > 0.0f)
 					{
 						float attenuation = lib->lights[i].attenuation / (dist * dist);
-						dest[j].colour += src[j].colour * lambert * attenuation * lightColour;
+						dest[j].colour += (int)(src[j].colour * lambert * attenuation * lightColour) >> 8;
 					}
 				}
 			} break;
@@ -115,9 +115,9 @@ void LightBuffer(MaggieBase *lib, struct MaggieTransVertex *dest, struct MaggieV
 				vec3_tform(&iLightDir, &iWorld, &lib->lights[i].dir, 0.0f);
 				for(int j = 0; j < nVerts; ++j)
 				{
-					float lam = -vec3_dot(&iLightDir, &src[j].normal);
-					if(lam > 0.0f)
-						dest[j].colour += src[j].colour * lam * lightColour;
+					float lambert = -vec3_dot(&iLightDir, &src[j].normal);
+					if(lambert > 0.0f)
+						dest[j].colour += (int)(src[j].colour * lambert * lightColour) >> 8;
 				}
 			} break;
 			case MAG_LIGHT_SPOT :
@@ -136,15 +136,15 @@ void LightBuffer(MaggieBase *lib, struct MaggieTransVertex *dest, struct MaggieV
 					vec3 lDir;
 					vec3_sub(&lDir, &src[j].pos, &iLightPos);
 					float dist = vec3_normalise(&lDir, &lDir);
-					float lam = vec3_dot(&lDir, &src[j].normal);
+					float lambert = vec3_dot(&lDir, &src[j].normal);
 					float angle = vec3_dot(&iLightDir, &lDir);
 					if(angle > cosPhi)
 					{
 						if(angle < cosTheta)
 						{
-							lam *= (angle - cosTheta) * ooPmT;
+							lambert *= (angle - cosTheta) * ooPmT;
 						}
-						dest[j].colour += src[j].colour * lam * lib->lights[i].attenuation / (dist * dist) * lightColour;
+						dest[j].colour += (int)(src[j].colour * lambert * lib->lights[i].attenuation / (dist * dist) * lightColour) >> 8;
 					}
 				}
 			} break;
@@ -159,8 +159,8 @@ void LightBuffer(MaggieBase *lib, struct MaggieTransVertex *dest, struct MaggieV
 	}
 	for(int i = 0; i < nVerts; ++i)
 	{
-		if(dest[i].colour > 65535)
-			dest[i].colour = 65535;
+		if(dest[i].colour > 255)
+			dest[i].colour = 255;
 	}
 }
 
