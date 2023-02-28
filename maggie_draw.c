@@ -13,6 +13,18 @@
 /*****************************************************************************/
 /*****************************************************************************/
 
+float TriangleArea(vec4 *p0, vec4 *p1, vec4 *p2)
+{
+	float x0 = p1->x - p0->x;
+	float y0 = p1->y - p0->y;
+	float x1 = p2->x - p0->x;
+	float y1 = p2->y - p0->y;
+
+	return x0 * y1 - x1 * y0;
+}
+
+/*****************************************************************************/
+
 static UBYTE ClipCode(const vec4 *v)
 {
 	UBYTE code = 0;
@@ -96,15 +108,12 @@ void NormaliseClippedVertexBuffer(struct MaggieTransVertex *vtx, int nVerts, Mag
 
 void DrawTriangle(struct MaggieTransVertex *vtx0, struct MaggieTransVertex *vtx1, struct MaggieTransVertex *vtx2, MaggieBase *lib)
 {
-	float x0 = vtx1->pos.x - vtx0->pos.x;
-	float y0 = vtx1->pos.y - vtx0->pos.y;
-	float x1 = vtx2->pos.x - vtx0->pos.x;
-	float y1 = vtx2->pos.y - vtx0->pos.y;
+	float area = TriangleArea(&vtx0->pos, &vtx1->pos, &vtx2->pos);
 
-	if(x0 * y1 - x1 * y0 > 0.0f)
-	{
+	if(lib->drawMode & MAG_DRAWMODE_CULL_CCW)
+		area = -area;
+	if(area > 0.0f)
 		return;
-	}
 
 	int miny = vtx0->pos.y;
 	if(miny > vtx1->pos.y)
@@ -130,15 +139,13 @@ void DrawPolygon(struct MaggieTransVertex *vtx, int nVerts, MaggieBase *lib)
 {
 	if(nVerts < 3)
 		return;
-	float x0 = vtx[1].pos.x - vtx[0].pos.x;
-	float y0 = vtx[1].pos.y - vtx[0].pos.y;
-	float x1 = vtx[2].pos.x - vtx[0].pos.x;
-	float y1 = vtx[2].pos.y - vtx[0].pos.y;
+	float area = TriangleArea(&vtx[0].pos, &vtx[1].pos, &vtx[2].pos);
 
-	if(x0 * y1 - x1 * y0 > 0.0f)
-	{
+	if(lib->drawMode & MAG_DRAWMODE_CULL_CCW)
+		area = -area;
+	if(area > 0.0f)
 		return;
-	}
+
 	int miny = vtx[0].pos.y;
 	int maxy = vtx[0].pos.y;
 	for(int i = 1; i < nVerts; ++i)
@@ -165,8 +172,18 @@ void DrawPolygon(struct MaggieTransVertex *vtx, int nVerts, MaggieBase *lib)
 
 void DrawIndexedPolygon(struct MaggieTransVertex *vtx, UWORD *indx, int nIndx, MaggieBase *lib)
 {
+	if(nIndx < 3)
+		return;
+
+	float area = TriangleArea(&vtx[indx[0]].pos, &vtx[indx[1]].pos, &vtx[indx[2]].pos);
+	if(lib->drawMode & MAG_DRAWMODE_CULL_CCW)
+		area = -area;
+	if(area >= 0.0f)
+		return;
+
 	int miny = vtx[indx[0]].pos.y;
 	int maxy = vtx[indx[0]].pos.y;
+
 	for(int i = 1; i < nIndx; ++i)
 	{
 		if(miny > vtx[indx[i]].pos.y)
@@ -202,6 +219,7 @@ void magDrawTrianglesUP(REG(a0, struct MaggieVertex *vtx), REG(d0, UWORD nVerts)
 	{
 		vtxBufferUP[i] = vtx[i];
 	}
+
 	PrepareVertexBuffer(vtxBufferUP, nVerts);
 
 	TransformVertexBuffer(transVtxBufferUP, vtxBufferUP, nVerts, lib);
@@ -265,6 +283,7 @@ void magDrawIndexedTrianglesUP(REG(a0, struct MaggieVertex *vtx), REG(d0, UWORD 
 	{
 		vtxBufferUP[i] = vtx[i];
 	}
+
 	PrepareVertexBuffer(vtxBufferUP, nVerts);
 
 	TransformVertexBuffer(transVtxBufferUP, vtxBufferUP, nVerts, lib);

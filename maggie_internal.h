@@ -282,9 +282,8 @@ APTR GetTextureData(ULONG *mem);
 
 /*****************************************************************************/
 
-void TransformVertexBufferUP(struct MaggieTransVertex * restrict dst, struct MaggieVertex * restrict src, UWORD nVerts, MaggieBase *lib);
-void PrepareVertexBuffer(struct MaggieVertex *vtx, UWORD nVerts);
-void TransformVertexBuffer(struct MaggieTransVertex *dstVtx, struct MaggieVertex *vtx, UWORD nVerts, MaggieBase *lib);
+void PrepareVertexBuffer(struct MaggieVertex * restrict vtx, UWORD nVerts);
+void TransformVertexBuffer(struct MaggieTransVertex * restrict dstVtx, struct MaggieVertex * restrict vtx, UWORD nVerts, MaggieBase *lib);
 
 /*****************************************************************************/
 

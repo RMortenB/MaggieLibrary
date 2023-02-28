@@ -75,13 +75,26 @@ void DrawLine(magEdgePos * restrict edge, int tex, const struct MaggieTransVerte
 
 void DrawEdge(struct MaggieTransVertex *vtx0, struct MaggieTransVertex *vtx1, MaggieBase *lib)
 {
-	magEdgePos *edge = lib->magLeftEdge;
-	if(vtx0->pos.y <= vtx1->pos.y)
+	if(lib->drawMode & MAG_DRAWMODE_CULL_CCW)
 	{
-		DrawLine(lib->magLeftEdge, 0, vtx0, vtx1);
+		if(vtx0->pos.y <= vtx1->pos.y)
+		{
+			DrawLine(lib->magRightEdge, 0, vtx0, vtx1);
+		}
+		else
+		{
+			DrawLine(lib->magLeftEdge, 0, vtx1, vtx0);
+		}
 	}
 	else
 	{
-		DrawLine(lib->magRightEdge, 0, vtx1, vtx0);
+		if(vtx0->pos.y <= vtx1->pos.y)
+		{
+			DrawLine(lib->magLeftEdge, 0, vtx0, vtx1);
+		}
+		else
+		{
+			DrawLine(lib->magRightEdge, 0, vtx1, vtx0);
+		}
 	}
 }

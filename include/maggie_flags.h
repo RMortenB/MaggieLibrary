@@ -8,12 +8,7 @@
 #define MAG_DRAWMODE_BILINEAR		0x0002
 #define MAG_DRAWMODE_32BIT			0x0004
 #define MAG_DRAWMODE_LIGHTING		0x0008
-
-/*****************************************************************************/
-
-#define MAG_DRAWMODE_BLEND_DISABLE	0x0000
-#define MAG_DRAWMODE_BLEND_ADD		0x0008
-#define MAG_DRAWMODE_BLEND_MUL		0x0010
+#define MAG_DRAWMODE_CULL_CCW		0x0010
 
 /*****************************************************************************/
 
