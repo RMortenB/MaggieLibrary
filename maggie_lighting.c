@@ -128,23 +128,27 @@ void LightBuffer(MaggieBase *lib, struct MaggieTransVertex *dest, struct MaggieV
 				vec3_tform(&iLightDir, &iWorld, &lib->lights[i].dir, 0.0f);
 
 				float cosPhi = cosf(lib->lights[i].phi);
-				float cosTheta = cosf((3.1415927f + cosPhi) / 2.0f);
-				float ooPmT = 1.0f / (cosPhi - cosTheta);
+				float cosTheta = cosf((lib->lights[i].phi) / 2.0f);
+				float ooPmT = 1.0f / (cosTheta - cosPhi);
+				vec3 lDir;
 				float lightColour = lib->lights[i].colour;
 				for(int j = 0; j < nVerts; ++j)
 				{
-					vec3 lDir;
-					vec3_sub(&lDir, &src[j].pos, &iLightPos);
+					vec3_sub(&lDir, &iLightPos, &src[j].pos);
 					float dist = vec3_normalise(&lDir, &lDir);
 					float lambert = vec3_dot(&lDir, &src[j].normal);
-					float angle = vec3_dot(&iLightDir, &lDir);
-					if(angle > cosPhi)
+					float cosAngle = vec3_dot(&iLightDir, &lDir);
+					if(lambert > 0.0f)
 					{
-						if(angle < cosTheta)
+						if(cosAngle > cosPhi)
 						{
-							lambert *= (angle - cosTheta) * ooPmT;
+							if(cosAngle < cosTheta)
+							{
+								lambert *= (cosAngle - cosPhi) * ooPmT;
+							}
+							float attenuation = lib->lights[i].attenuation / (dist * dist);
+							dest[j].colour += (int)(src[j].colour * lambert * attenuation * lightColour) >> 8;
 						}
-						dest[j].colour += (int)(src[j].colour * lambert * lib->lights[i].attenuation / (dist * dist) * lightColour) >> 8;
 					}
 				}
 			} break;
