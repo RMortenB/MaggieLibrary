@@ -21,11 +21,6 @@ void magSetTexture(REG(d0, UWORD unit), REG(d1, UWORD txtr), REG(a6, MaggieBase 
 
 void magSetDrawMode(REG(d0, UWORD mode), REG(a6, MaggieBase *lib))
 {
-	if((mode & MAG_DRAWMODE_DEPTHBUFFER) & !lib->depthBuffer)
-	{
-		struct ExecBase *SysBase = lib->sysBase;
-		lib->depthBuffer = AllocMem(MAGGIE_MAX_XRES * MAGGIE_MAX_YRES * sizeof(UWORD), MEMF_ANY | MEMF_CLEAR);
-	}
 	lib->drawMode = mode;
 }
 
