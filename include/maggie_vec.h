@@ -31,36 +31,34 @@ typedef struct mat4
 
 /*****************************************************************************/
 
-static inline float mag_rsqrtf(float num)
+static float mag_rsqrtf(float num)
 {
-        const float threehalfs = 1.5F;
-        union
-        {
-                int i;
-                float f;
-        } val;
+	const float threehalfs = 1.5F;
+	union
+	{
+		int i;
+		float f;
+	} val;
 
-        float x2 = num * 0.5F;
-        val.f = num;
-        val.i  = 0x5f3759df - (val.i >> 1);
-        num  = val.f;
-        num  = num * (threehalfs - (x2 * num * num));   // 1st iteration
-        num  = num * (threehalfs - (x2 * num * num));   // 2nd iteration
-        num  = num * (threehalfs - (x2 * num * num));   // 3rd iteration
+	float x2 = num * 0.5F;
+	val.f = num;
+	val.i  = 0x5f375a86 - (val.i >> 1);
+	num  = val.f;
+	num  = num * (threehalfs - (x2 * num * num));   /* 1st iteration */
 
-        return num;
+	return num;
 }
 
 /*****************************************************************************/
 
-static inline float mag_sqrtf(float num)
+static float mag_sqrtf(float num)
 {
         return mag_rsqrtf(num) * num;
 }
 
 /*****************************************************************************/
 
-static inline void vec3_set(vec3 *res, float x, float y, float z)
+static void vec3_set(vec3 *res, float x, float y, float z)
 {
 	res->x = x;
 	res->y = y;
@@ -69,14 +67,14 @@ static inline void vec3_set(vec3 *res, float x, float y, float z)
 
 /*****************************************************************************/
 
-static inline float vec3_dot(const vec3 *a, const vec3 *b)
+static float vec3_dot(const vec3 *a, const vec3 *b)
 {
 	return a->x * b->x + a->y * b->y + a->z * b->z;
 }
 
 /*****************************************************************************/
 
-static inline void vec3_cross(vec3 *res, const vec3 *a, const vec3 *b)
+static void vec3_cross(vec3 *res, const vec3 *a, const vec3 *b)
 {
 	res->x = a->y * b->z - a->z * b->y;
 	res->y = a->z * b->x - a->x * b->z;
@@ -85,7 +83,7 @@ static inline void vec3_cross(vec3 *res, const vec3 *a, const vec3 *b)
 
 /*****************************************************************************/
 
-static inline void vec3_sub(vec3 *res, const vec3 *a, const vec3 *b)
+static void vec3_sub(vec3 *res, const vec3 *a, const vec3 *b)
 {
 	res->x = a->x - b->x;
 	res->y = a->y - b->y;
@@ -94,7 +92,7 @@ static inline void vec3_sub(vec3 *res, const vec3 *a, const vec3 *b)
 
 /*****************************************************************************/
 
-static inline void vec3_add(vec3 *res, const vec3 *a, const vec3 *b)
+static void vec3_add(vec3 *res, const vec3 *a, const vec3 *b)
 {
 	res->x = a->x + b->x;
 	res->y = a->y + b->y;
@@ -103,7 +101,7 @@ static inline void vec3_add(vec3 *res, const vec3 *a, const vec3 *b)
 
 /*****************************************************************************/
 
-static inline void vec3_scale(vec3 *res, const vec3 *v, float f)
+static void vec3_scale(vec3 *res, const vec3 *v, float f)
 {
 	res->x = v->x * f;
 	res->y = v->y * f;
@@ -112,21 +110,21 @@ static inline void vec3_scale(vec3 *res, const vec3 *v, float f)
 
 /*****************************************************************************/
 
-static inline float vec3_len(const vec3 *v)
+static float vec3_len(const vec3 *v)
 {
 	return mag_sqrtf(vec3_dot(v, v));
 }
 
 /*****************************************************************************/
 
-static inline float vec3_lensq(const vec3 *v)
+static float vec3_lensq(const vec3 *v)
 {
 	return vec3_dot(v, v);
 }
 
 /*****************************************************************************/
 
-static inline float vec3_normalise(vec3 *res, const vec3 *v)
+static float vec3_normalise(vec3 *res, const vec3 *v)
 {
 	float len = vec3_len(v);
 	float oolen = 1.0f / len;
@@ -140,7 +138,7 @@ static inline float vec3_normalise(vec3 *res, const vec3 *v)
 
 /*****************************************************************************/
 
-static inline void vec3_min(vec3 *res, const vec3 *a, const vec3 *b)
+static void vec3_min(vec3 *res, const vec3 *a, const vec3 *b)
 {
 	res->x = a->x < b->x ? a->x : b->x;
 	res->y = a->y < b->y ? a->y : b->y;
@@ -149,7 +147,7 @@ static inline void vec3_min(vec3 *res, const vec3 *a, const vec3 *b)
 
 /*****************************************************************************/
 
-static inline void vec3_max(vec3 *res, const vec3 *a, const vec3 *b)
+static void vec3_max(vec3 *res, const vec3 *a, const vec3 *b)
 {
 	res->x = a->x > b->x ? a->x : b->x;
 	res->y = a->y > b->y ? a->y : b->y;
@@ -158,7 +156,7 @@ static inline void vec3_max(vec3 *res, const vec3 *a, const vec3 *b)
 
 /*****************************************************************************/
 
-static inline void vec3_clamp(vec3 *res, const vec3 *v, float minVal, float maxVal)
+static void vec3_clamp(vec3 *res, const vec3 *v, float minVal, float maxVal)
 {
 	res->x = v->x < maxVal ? (v->x > minVal ? v->x : minVal) : maxVal;
 	res->y = v->y < maxVal ? (v->y > minVal ? v->y : minVal) : maxVal;
@@ -167,7 +165,7 @@ static inline void vec3_clamp(vec3 *res, const vec3 *v, float minVal, float maxV
 
 /*****************************************************************************/
 
-static inline void vec3_lerp(vec3 *res, const vec3 *a, const vec3 *b, float ratio)
+static void vec3_lerp(vec3 *res, const vec3 *a, const vec3 *b, float ratio)
 {
 	res->x = (b->x - a->x) * ratio + a->x;
 	res->y = (b->y - a->y) * ratio + a->y;
@@ -176,18 +174,20 @@ static inline void vec3_lerp(vec3 *res, const vec3 *a, const vec3 *b, float rati
 
 /*****************************************************************************/
 
-static inline void vec3_barycentric(vec3 *res, vec3 *a, vec3 *b, vec3 *c, vec3 *p)
+static void vec3_barycentric(vec3 *res, vec3 *a, vec3 *b, vec3 *c, vec3 *p)
 {
 	vec3 v0, v1, v2;
+	float d00, d01, d11, d20, d21;
+	float denom;
 	vec3_sub(&v0, b, a);
 	vec3_sub(&v1, c, a);
 	vec3_sub(&v2, p, a);
-	float d00 = vec3_dot(&v0, &v0);
-	float d01 = vec3_dot(&v0, &v1);
-	float d11 = vec3_dot(&v1, &v1);
-	float d20 = vec3_dot(&v2, &v0);
-	float d21 = vec3_dot(&v2, &v1);
-	float denom = d00 * d11 - d01 * d01;
+	d00 = vec3_dot(&v0, &v0);
+	d01 = vec3_dot(&v0, &v1);
+	d11 = vec3_dot(&v1, &v1);
+	d20 = vec3_dot(&v2, &v0);
+	d21 = vec3_dot(&v2, &v1);
+	denom = d00 * d11 - d01 * d01;
 	res->x = (d11 * d20 - d01 * d21) / denom;
 	res->y = (d00 * d21 - d01 * d20) / denom;
 	res->z = 1.0f - res->x - res->y;
@@ -197,9 +197,10 @@ static inline void vec3_barycentric(vec3 *res, vec3 *a, vec3 *b, vec3 *c, vec3 *
 
 static void mat4_identity(mat4 *res)
 {
-	for(int i = 0; i < 4; ++i)
+	int i, j;
+	for(i = 0; i < 4; ++i)
 	{
-		for(int j = 0; j < 4; ++j)
+		for(j = 0; j < 4; ++j)
 		{
 			res->m[i][j] = (i == j) ? 1.0f : 0.0f;
 		}
@@ -287,8 +288,8 @@ static void mat4_mul(mat4 *res, const mat4 *a, const mat4 *b)
 
 static void mat4_rotateX(mat4 *res, float angle)
 {
-	float s = sinf(angle);
-	float c = cosf(angle);
+	float s = (float)sin(angle);
+	float c = (float)cos(angle);
 
 	mat4_identity(res);
 
@@ -302,8 +303,8 @@ static void mat4_rotateX(mat4 *res, float angle)
 
 static void mat4_rotateY(mat4 *res, float angle)
 {
-	float s = sinf(angle);
-	float c = cosf(angle);
+	float s = (float)sin(angle);
+	float c = (float)cos(angle);
 
 	mat4_identity(res);
 
@@ -317,8 +318,8 @@ static void mat4_rotateY(mat4 *res, float angle)
 
 static void mat4_rotateZ(mat4 *res, float angle)
 {
-	float s = sinf(angle);
-	float c = cosf(angle);
+	float s = (float)sin(angle);
+	float c = (float)cos(angle);
 
 	mat4_identity(res);
 
@@ -340,12 +341,12 @@ static void mat4_translate(mat4 *res, float x, float y, float z)
 
 /*****************************************************************************/
 
-static inline void mat4_perspective(mat4 *res, float fov, float aspect, float znear, float zfar)
+static void mat4_perspective(mat4 *res, float fov, float aspect, float znear, float zfar)
 {
 	float w, h;
 
 	fov *= 0.5f * 3.1415927f / 180.0f;
-	w = cosf(fov) / sinf(fov);
+	w = (float)cos(fov) / (float)sin(fov);
 	h = w / aspect;
 
 	mat4_identity(res);
@@ -360,20 +361,21 @@ static inline void mat4_perspective(mat4 *res, float fov, float aspect, float zn
 
 /*****************************************************************************/
 
-static inline void mat4_inverseLight(mat4 *res, const mat4 *mat)
+static void mat4_inverseLight(mat4 *res, const mat4 *mat)
 {
-	for(int i = 0; i < 3; ++i)
+	int i, j;
+	for(i = 0; i < 3; ++i)
 	{
-		for(int j = 0; j < 3; ++j)
+		for(j = 0; j < 3; ++j)
 		{
 			res->m[i][j] = mat->m[j][i];
 		}
 		res->m[i][3] = 0.0f;
 	}
-	for(int i = 0; i < 3; ++i)
+	for(i = 0; i < 3; ++i)
 	{
 		res->m[3][i] = 0.0f;
-		for(int j = 0; j < 3; ++j)
+		for(j = 0; j < 3; ++j)
 		{
 			res->m[3][i] += -res->m[j][i] * mat->m[3][j];
 		}
@@ -383,7 +385,7 @@ static inline void mat4_inverseLight(mat4 *res, const mat4 *mat)
 
 /*****************************************************************************/
 
-static inline void mat4_LookAt(mat4 *mat, const vec3 *pos, const vec3 *target, const vec3 *up)
+static void mat4_LookAt(mat4 *mat, const vec3 *pos, const vec3 *target, const vec3 *up)
 {
 	vec3 xVec, yVec, zVec;
 
@@ -472,13 +474,14 @@ static void mat4_FromQuat(mat4 *res, quat4 *q)
 
 static void quat4_AxisAngle(quat4 *res, vec3 *axis, float angle)
 {
-	float s = sin(angle / 2.0f);
+	float s = (float)sin(angle / 2.0f);
 	res->x = axis->x * s;
 	res->y = axis->y * s;
 	res->z = axis->z * s;
-	res->w = cos(angle / 2.0f);
+	res->w = (float)cos(angle / 2.0f);
 }
 
 /*****************************************************************************/
-
-#endif // MAGGIE_VEC3_H_INCLUDED
+ 
+ /* MAGGIE_VEC3_H_INCLUDED */
+#endif

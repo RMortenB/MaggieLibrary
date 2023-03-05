@@ -33,5 +33,8 @@ $(TARGET): $(OBJS) Makefile
 purge: clean
 	rm -f $(TARGET)
 
+strip:
+	m68k-amigaos-strip $(TARGET)
+
 clean:
 	rm -f $(OBJS) $(TARGET)

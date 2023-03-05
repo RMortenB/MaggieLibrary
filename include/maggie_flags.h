@@ -27,4 +27,5 @@
 
 /*****************************************************************************/
 
-#endif // MAGGIE_FLAGS_H_INCLUDED
+/* MAGGIE_FLAGS_H_INCLUDED */
+#endif

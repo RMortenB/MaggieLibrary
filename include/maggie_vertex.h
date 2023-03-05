@@ -50,5 +50,5 @@ struct SpanPosition
 	UWORD intensity;
 };
 
-
-#endif // MAGGIE_VERTEX_H_INCLUDED
+/* MAGGIE_VERTEX_H_INCLUDED */
+#endif

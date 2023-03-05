@@ -181,6 +181,8 @@ static APTR maggieInit(int segList __asm("a0"), MaggieBase *lib __asm("d0"), str
 	mat4_identity(&lib->modelviewProj);
 	lib->dirtyMatrix = 0;
 
+	lib->depthBuffer = AllocMem(MAGGIE_MAX_XRES * MAGGIE_MAX_YRES * sizeof(UWORD), MEMF_ANY | MEMF_CLEAR);
+
 	return lib;
 }
 
