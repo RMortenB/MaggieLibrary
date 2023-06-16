@@ -60,4 +60,7 @@ magSetLightCone(light,phi)(d0,fp0)
 magSetLightAttenuation(light,attenuation)(d0,fp0)
 magSetLightColour(light,colour)(d0,d1)
 *
+magClearColour(colour)(d0)
+magClearDepth(depth)(d0)
+*
 ##end

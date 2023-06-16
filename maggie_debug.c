@@ -209,7 +209,6 @@ void TextOut(MaggieBase *lib, char *fmt, ...)
                     {
 						double dd = va_arg(vl, double);
                         dstPos += FloatToStr(&destBuffer[dstPos], (float)dd);
-						dd = va_arg(vl, double);
                     } break;
                     case 'd' :
                     {

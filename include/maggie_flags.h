@@ -12,8 +12,23 @@
 
 /*****************************************************************************/
 
+#define MAG_DRAWMODE_TEXGEN_UV		0x0000
+#define MAG_DRAWMODE_TEXGEN_POS		0x0020
+#define MAG_DRAWMODE_TEXGEN_NORMAL	0x0040
+#define MAG_DRAWMODE_TEXGEN_REFLECT	0x0060
+
+#define MAG_DRAWMODE_TEXGEN_MASK	0x0060
+
+/*****************************************************************************/
+
 #define MAG_CLEAR_COLOUR 0x0001
 #define MAG_CLEAR_DEPTH 0x0002
+
+/*****************************************************************************/
+
+#define MAG_TEXFMT_DXT1	0x0000
+#define MAG_TEXFMT_RGB	0x0001
+#define MAG_TEXFMT_RGBA	0x0002
 
 /*****************************************************************************/
 

@@ -2,7 +2,7 @@
 #define MAGGIE_INTERNAL_H_INCLUDED
 
 /*****************************************************************************/
-
+#include <stdint.h>
 #include <exec/types.h>
 #include <proto/exec.h>
 #include <exec/semaphores.h>
@@ -14,8 +14,14 @@
 
 /*****************************************************************************/
 
-#define MAGGIE_MAX_XRES 1280
-#define MAGGIE_MAX_YRES 720
+#define MAGGIE_MAX_XRES 1920
+#define MAGGIE_MAX_YRES 1080
+
+/*****************************************************************************/
+
+#define PIXEL_RUN 32
+
+#define PROFILE 0
 
 /*****************************************************************************/
 
@@ -36,10 +42,10 @@
 typedef struct
 {
 	float xPos;
+	float zow;
 	float oow;
 	float uow;
 	float vow;
-	float zow;
 	float iow;
 } magEdgePos;
 
@@ -84,6 +90,11 @@ struct MaggieBase
 
 	/*******************/
 
+	ULONG clearColour;
+	UWORD clearDepth;
+
+	/*******************/
+
 	UWORD texSize;
 	APTR texture;
 
@@ -100,7 +111,8 @@ struct MaggieBase
 	mat4 worldMatrix;
 	mat4 viewMatrix;
 	mat4 perspectiveMatrix;
-	mat4 modelviewProj;
+	mat4 modelViewProj;
+	mat4 modelView;
 	int dirtyMatrix;
 
 	/*******************/
@@ -133,6 +145,29 @@ struct MaggieBase
 
 	magEdgePos magLeftEdge[MAGGIE_MAX_YRES];
 	magEdgePos magRightEdge[MAGGIE_MAX_YRES];
+
+#if PROFILE
+	struct
+	{
+		ULONG lines;
+		ULONG spans;
+		ULONG trans;
+		ULONG frame;
+		ULONG clear;
+
+		ULONG count;
+		ULONG linesmin;
+		ULONG spansmin;
+		ULONG transmin;
+		ULONG clearmin;
+		ULONG framemin;
+		ULONG linesmax;
+		ULONG spansmax;
+		ULONG transmax;
+		ULONG clearmax;
+		ULONG framemax;
+	} profile;
+#endif
 };
 
 /*****************************************************************************/
@@ -262,6 +297,8 @@ void magColour(REG(d0, ULONG col), REG(a6, MaggieBase *lib));
 /*****************************************************************************/
 
 void magClear(REG(d0, UWORD buffers), REG(a6, MaggieBase *lib));
+void magClearColour(REG(d0, ULONG colour), REG(a6, MaggieBase *lib));
+void magClearDepth(REG(d0, UWORD depth), REG(a6, MaggieBase *lib));
 
 /*****************************************************************************/
 
@@ -273,6 +310,7 @@ void magSetLightAttenuation(REG(d0, UWORD light), REG(fp0, float attenuation), R
 void magSetLightColour(REG(d0, UWORD light), REG(d1, ULONG colour), REG(a6, MaggieBase *lib));
 
 /*****************************************************************************/
+
 // Private functions
 
 ULONG GetTextureMipMapSize(UWORD texSize);
@@ -282,8 +320,9 @@ APTR GetTextureData(ULONG *mem);
 
 /*****************************************************************************/
 
-void PrepareVertexBuffer(struct MaggieVertex * restrict vtx, UWORD nVerts);
+void PrepareVertexBuffer(struct MaggieTransVertex *transDst, struct MaggieVertex *vtx, UWORD nVerts);
 void TransformVertexBuffer(struct MaggieTransVertex * restrict dstVtx, struct MaggieVertex * restrict vtx, UWORD nVerts, MaggieBase *lib);
+void TexGenBuffer(struct MaggieTransVertex *dstVtx, struct MaggieVertex *vtx, UWORD nVerts, MaggieBase *lib);
 
 /*****************************************************************************/
 
@@ -319,7 +358,7 @@ int ClipPolygon(struct MaggieTransVertex *verts, int nVerts);
 
 /*****************************************************************************/
 
-void LightBuffer(MaggieBase *lib, struct MaggieTransVertex *dest, struct MaggieVertex *src, int nVerts);
+void LightBuffer(struct MaggieTransVertex *dest, struct MaggieVertex *src, int nVerts, MaggieBase *lib);
 
 /*****************************************************************************/
 // Asm functions
@@ -327,5 +366,10 @@ void LightBuffer(MaggieBase *lib, struct MaggieTransVertex *dest, struct MaggieV
 void magFastClear(void *buffer __asm("a0"), ULONG nBytes __asm("d0"), ULONG data __asm("d1"));
 
 /*****************************************************************************/
+
+
+#if PROFILE
+ULONG GetClocks();
+#endif
 
 #endif // MAGGIE_INTERNAL_H_INCLUDED

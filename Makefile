@@ -6,20 +6,25 @@ CC=m68k-amigaos-gcc
 
 SOURCES=maggie.c \
 		maggie_funcs.c \
-		maggie_clip.c \
-		maggie_draw.c \
 		maggie_transform.c \
+		maggie_lighting.c \
+		maggie_draw.c \
+		maggie_clip.c \
 		maggie_linedraw.c \
 		maggie_raster.c \
-		maggie_lighting.c \
+		maggie_raster32.c \
+		maggie_rasterSW32.c \
+		maggie_raster16.c \
+		maggie_rasterSW16.c \
+		maggie_texture.c \
 		maggie_debug.c \
 		maggie_buffers.s
 
 ASFLAGS=-m68080 -m68882 -quiet -Fhunk
 
-CFLAGS=-std=c99 -Ofast -fomit-frame-pointer -m68080 -Wall -Wno-unused-function -Wno-unused-variable -I include
+CFLAGS=-std=c99 -noixemul -Ofast -fomit-frame-pointer -m68080 -Wall -Wno-unused-function -Wno-unused-variable -I include
 
-LFLAGS=-nostartfiles 
+LFLAGS=-nostartfiles
 LDLIBS=
 
 OBJSC=$(SOURCES:.c=.o)

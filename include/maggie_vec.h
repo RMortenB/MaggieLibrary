@@ -67,6 +67,15 @@ static void vec3_set(vec3 *res, float x, float y, float z)
 
 /*****************************************************************************/
 
+static void vec3_neg(vec3 *res, vec3 *a)
+{
+	res->x = -a->x;
+	res->y = -a->y;
+	res->z = -a->z;
+}
+
+/*****************************************************************************/
+
 static float vec3_dot(const vec3 *a, const vec3 *b)
 {
 	return a->x * b->x + a->y * b->y + a->z * b->z;

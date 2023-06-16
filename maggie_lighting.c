@@ -75,7 +75,7 @@ void magSetLightColour(REG(d0, UWORD light), REG(d1, ULONG colour), REG(a6, Magg
 
 /*****************************************************************************/
 
-void LightBuffer(MaggieBase *lib, struct MaggieTransVertex *dest, struct MaggieVertex *src, int nVerts)
+void LightBuffer(struct MaggieTransVertex *dest, struct MaggieVertex *src, int nVerts, MaggieBase *lib)
 {
 	for(int i = 0; i < nVerts; ++i)
 	{
@@ -163,8 +163,8 @@ void LightBuffer(MaggieBase *lib, struct MaggieTransVertex *dest, struct MaggieV
 	}
 	for(int i = 0; i < nVerts; ++i)
 	{
-		if(dest[i].colour > 255)
-			dest[i].colour = 255;
+		if(dest[i].colour > 0xffff)
+			dest[i].colour = 0xffff;
 	}
 }
 

@@ -22,6 +22,11 @@ struct MaggieTexCoord
 	float u, v, w;
 };
 
+struct MaggieTexCoord2
+{
+	float u, v;
+};
+
 /*****************************************************************************/
 
 struct MaggieVertex

@@ -55,6 +55,13 @@ void magSetIndexBuffer(REG(d0, WORD iBuffer), REG(a6, MaggieBase *lib))
 /*****************************************************************************/
 /*****************************************************************************/
 
+ULONG ColourTo16Bit(ULONG colour)
+{
+	return ((colour >> 8) & 0xf800) | ((colour >> 1) & 0x07e0)  | ((colour >> 3) & 0x001f);
+}
+
+/*****************************************************************************/
+
 UWORD GetVBNumVerts(ULONG *mem)
 {
 	return mem[0];
@@ -132,7 +139,8 @@ void magUploadVertexBuffer(REG(d0, UWORD vBuffer), REG(a0, struct MaggieVertex *
 	{
 		dst[i + startVtx] = vtx[startVtx + i];
 	}
-	PrepareVertexBuffer(&dst[startVtx], nVerts);
+	struct MaggieTransVertex *transDst = GetVBTransVertices(mem);
+	PrepareVertexBuffer(&transDst[startVtx], &dst[startVtx], nVerts);
 }
 
 /*****************************************************************************/
@@ -245,138 +253,42 @@ void magFreeIndexBuffer(REG(d0, UWORD iBuffer), REG(a6, MaggieBase *lib))
 
 /*****************************************************************************/
 
-ULONG GetTextureMipMapSize(UWORD texSize)
-{
-	switch(texSize)
-	{
-		case 9 : return 512*512 / 2;
-		case 8 : return 256*256 / 2;
-		case 7 : return 128*128 / 2;
-		case 6 : return 64*64 / 2;
-	}
-	return 0;
-}
-
-/*****************************************************************************/
-
-ULONG GetTextureSize(UWORD texSize)
-{
-	switch(texSize)
-	{
-		case 9 : return (512*512 + 256*256 + 128*128 + 64*64) / 2;
-		case 8 : return (256*256 + 128*128 + 64*64) / 2;
-		case 7 : return (128*128 + 64*64) / 2;
-		case 6 : return (64*64) / 2;
-	}
-	return 0;
-}
-
-/*****************************************************************************/
-
-ULONG GetTextureMipMapOffset(UWORD topLevel, UWORD mipmap)
-{
-	if(topLevel < mipmap)
-		return 0;
-	return GetTextureSize(topLevel) & ~GetTextureSize(mipmap);
-}
-
-/*****************************************************************************/
-
-APTR GetTextureData(ULONG *mem)
-{
-	return &mem[2];
-}
-
-/*****************************************************************************/
-
-UWORD magAllocateTexture(REG(d0, UWORD size), REG(a6, MaggieBase *lib))
-{
-	UWORD txtr = ~0;
-
-	struct ExecBase *SysBase = lib->sysBase;
-
-	ObtainSemaphore(&lib->lock);
-
-	for(int i = 0; i < MAX_INDEX_BUFFERS; ++i)
-	{
-		if(!lib->textures[i])
-		{
-			txtr = i;
-			lib->textures[i] = (ULONG *)1;
-			break;
-		}
-	}
-
-	ReleaseSemaphore(&lib->lock);
-
-	if(txtr == ~0)
-	{
-		return ~0;
-	}
-
-	int txtrMemSize = GetTextureSize(size) + sizeof(ULONG) * 2;
-
-	ULONG *mem = (ULONG *)AllocMem(txtrMemSize, MEMF_ANY | MEMF_CLEAR);
-	mem[0] = size;
-	mem[1] = txtrMemSize;
-	lib->textures[txtr] = mem;
-
-	return txtr;
-}
-
-/*****************************************************************************/
-
-void magUploadTexture(REG(d0, UWORD txtr), REG(d1, UWORD mipmap), REG(a0, APTR data), REG(d2, UWORD format), REG(a6, MaggieBase *lib))
-{
-	ULONG *mem = lib->textures[txtr];
-	if(!mem)
-		return;
-
-	if(mipmap > mem[0])
-		return;
-	if(mipmap < 6)
-		return;
-
-	ULONG mipmapSize = GetTextureMipMapSize(mem[0]);
-	ULONG mipmapOffset = GetTextureMipMapOffset(mem[0], mipmap);
-
-	UBYTE *dst = ((UBYTE *)&mem[2]) + mipmapOffset;
-	UBYTE *src = (UBYTE *)data;
-
-	for(int i = 0; i < mipmapSize; ++i)
-	{
-		dst[i] = src[i];
-	}
-}
-
-/*****************************************************************************/
-
-void magFreeTexture(REG(d0, UWORD txtr), REG(a6, MaggieBase *lib))
-{
-	if(txtr >= MAX_TEXTURES)
-		return;
-
-	ULONG *mem = lib->textures[txtr];
-
-	if(!mem)
-		return;
-
-	struct ExecBase *SysBase = lib->sysBase;
-
-	ULONG size = mem[1];
-	FreeMem(mem, size);
-
-	lib->textures[txtr] = NULL;
-}
-
-/*****************************************************************************/
-
 // Library Lock..
 void magBeginScene(REG(a6, MaggieBase *lib))
 {
 	struct ExecBase *SysBase = lib->sysBase;
 	ObtainSemaphore(&lib->lock);
+	for(int i = 0; i < MAG_MAX_LIGHTS; ++i)
+	{
+		lib->lights[i].type = MAG_LIGHT_OFF;
+	}
 	DebugReset();
+	lib->colour = 0x00ffffff;
+#if PROFILE
+	if(lib->profile.count > 10)
+	{
+		lib->profile.count = 0;
+		lib->profile.linesmin = ~0;
+		lib->profile.spansmin = ~0;
+		lib->profile.transmin = ~0;
+		lib->profile.clearmin = ~0;
+		lib->profile.framemin = ~0;
+		lib->profile.linesmax = 0;
+		lib->profile.spansmax = 0;
+		lib->profile.transmax = 0;
+		lib->profile.clearmax = 0;
+		lib->profile.framemax = 0;
+	}
+	lib->profile.count++;
+
+	lib->profile.lines = 0;
+	lib->profile.spans = 0;
+	lib->profile.trans = 0;
+	lib->profile.clear = 0;
+	lib->profile.frame = GetClocks();
+#endif
+
+
 }
 
 /*****************************************************************************/
@@ -384,6 +296,36 @@ void magBeginScene(REG(a6, MaggieBase *lib))
 void magEndScene(REG(a6, MaggieBase *lib))
 {
 	struct ExecBase *SysBase = lib->sysBase;
+#if PROFILE
+	lib->profile.frame = GetClocks() - lib->profile.frame;
+	if(lib->profile.framemin > lib->profile.frame)
+		lib->profile.framemin = lib->profile.frame;
+	if(lib->profile.linesmin > lib->profile.lines)
+		lib->profile.linesmin = lib->profile.lines;
+	if(lib->profile.spansmin > lib->profile.spans)
+		lib->profile.spansmin = lib->profile.spans;
+	if(lib->profile.transmin > lib->profile.trans)
+		lib->profile.transmin = lib->profile.trans;
+	if(lib->profile.clearmin > lib->profile.clear)
+		lib->profile.clearmin = lib->profile.clear;
+
+	if(lib->profile.framemax < lib->profile.frame)
+		lib->profile.framemax = lib->profile.frame;
+	if(lib->profile.linesmax < lib->profile.lines)
+		lib->profile.linesmax = lib->profile.lines;
+	if(lib->profile.spansmax < lib->profile.spans)
+		lib->profile.spansmax = lib->profile.spans;
+	if(lib->profile.transmax < lib->profile.trans)
+		lib->profile.transmax = lib->profile.trans;
+	if(lib->profile.clearmax < lib->profile.clear)
+		lib->profile.clearmax = lib->profile.clear;
+
+	TextOut(lib, "Frame : (%d, %d) %d", lib->profile.framemin, lib->profile.framemax, lib->profile.frame);
+	TextOut(lib, "Lines : (%d, %d) %d", lib->profile.linesmin, lib->profile.linesmax, lib->profile.lines);
+	TextOut(lib, "Spans : (%d, %d) %d", lib->profile.spansmin, lib->profile.spansmax, lib->profile.spans);
+	TextOut(lib, "Trans : (%d, %d) %d", lib->profile.transmin, lib->profile.transmax, lib->profile.trans);
+	TextOut(lib, "Clear : (%d, %d) %d", lib->profile.clearmin, lib->profile.clearmax, lib->profile.clear);
+#endif
 	ReleaseSemaphore(&lib->lock);
 }
 
@@ -472,20 +414,52 @@ void magColour(REG(d0, ULONG col), REG(a6, MaggieBase *lib))
 
 void magClear(REG(d0, UWORD buffers), REG(a6, MaggieBase *lib))
 {
+#if PROFILE
+	ULONG startTime = GetClocks();
+#endif
+
 	struct ExecBase *SysBase = lib->sysBase;
 	if(buffers & MAG_CLEAR_COLOUR)
 	{
-		int size = (lib->drawMode & MAG_DRAWMODE_32BIT) ? lib->xres * lib->yres * 4 : lib->xres * lib->yres * 2;
-		magFastClear(lib->screen, size, 0);
+		if(lib->drawMode & MAG_DRAWMODE_32BIT)
+		{
+			int size = (lib->xres * lib->yres * 4) & ~15;
+			magFastClear(lib->screen, size, lib->clearColour);
+		}
+		else
+		{
+			int size = (lib->xres * lib->yres * 2) & ~15;
+			ULONG colour = ColourTo16Bit(lib->clearColour);
+			colour |= colour << 16;
+			magFastClear(lib->screen, size, colour);
+		}
 	}
 	if(buffers & MAG_CLEAR_DEPTH)
 	{
 		if(lib->depthBuffer)
 		{
 			int size = lib->xres * lib->yres * 2;
-			magFastClear(lib->depthBuffer, size, ~0);
+			size = (size + 15) & ~15;
+			magFastClear(lib->depthBuffer, size, lib->clearDepth | (lib->clearDepth << 16));
 		}
 	}
+#if PROFILE
+	lib->profile.clear += GetClocks() - startTime;
+#endif
+}
+
+/*****************************************************************************/
+
+void magClearColour(REG(d0, ULONG colour), REG(a6, MaggieBase *lib))
+{
+	lib->clearColour = colour;
+}
+
+/*****************************************************************************/
+
+void magClearDepth(REG(d0, UWORD depth), REG(a6, MaggieBase *lib))
+{
+	lib->clearDepth = depth;
 }
 
 /*****************************************************************************/

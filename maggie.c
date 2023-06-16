@@ -130,19 +130,21 @@ static APTR functionTable[] =
 	magSetLightCone,
 	magSetLightAttenuation,
 	magSetLightColour,
+	magClearColour,
+	magClearDepth,
 	(APTR)-1
 };
 
 static const char libName[] = "maggie.library";
-static const char libId[] = "maggie 1.00 (20.1.2023)";
+static const char libId[] = "maggie 1.20 (20.1.2023)";
 
 static APTR maggieInit(int segList __asm("a0"), MaggieBase *lib __asm("d0"), struct ExecBase *sysBase __asm("a6"))
 {
 	lib->lib.lib_Node.ln_Type = NT_LIBRARY;
 	lib->lib.lib_Node.ln_Name = (char *)libName;
 	lib->lib.lib_Flags = LIBF_CHANGED | LIBF_SUMUSED;
-	lib->lib.lib_Version = 1;
-	lib->lib.lib_Revision = 0;
+	lib->lib.lib_Version = 2;
+	lib->lib.lib_Revision = 2;
 	lib->lib.lib_IdString = (char *)libId;
 
 	lib->segList = segList;
@@ -157,6 +159,9 @@ static APTR maggieInit(int segList __asm("a0"), MaggieBase *lib __asm("d0"), str
 
 	lib->immModeVtx = 0xffff;
 	lib->nIModeVtx = 0;
+
+	lib->clearColour = 0x00000000;
+	lib->clearDepth = 0xffff;
 
 	for(int i = 0; i < MAX_VERTEX_BUFFERS; ++i)
 	{
@@ -178,7 +183,9 @@ static APTR maggieInit(int segList __asm("a0"), MaggieBase *lib __asm("d0"), str
 	mat4_identity(&lib->worldMatrix);
 	mat4_identity(&lib->viewMatrix);
 	mat4_identity(&lib->perspectiveMatrix);
-	mat4_identity(&lib->modelviewProj);
+	mat4_identity(&lib->modelViewProj);
+	mat4_identity(&lib->modelView);
+
 	lib->dirtyMatrix = 0;
 
 	lib->depthBuffer = AllocMem(MAGGIE_MAX_XRES * MAGGIE_MAX_YRES * sizeof(UWORD), MEMF_ANY | MEMF_CLEAR);
@@ -200,7 +207,7 @@ const struct Resident romTag =
 	(APTR)&romTag,
 	(APTR)&romTag + 1,
 	RTF_AUTOINIT,
-	1,
+	2,
 	NT_LIBRARY,
 	0,
 	(APTR)libName,
