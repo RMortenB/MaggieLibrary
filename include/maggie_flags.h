@@ -29,6 +29,8 @@
 #define MAG_TEXFMT_DXT1	0x0000
 #define MAG_TEXFMT_RGB	0x0001
 #define MAG_TEXFMT_RGBA	0x0002
+#define MAG_TEXFMT_MASK	0x00ff
+#define MAG_TEXCOMP_HQ	0x8000
 
 /*****************************************************************************/
 

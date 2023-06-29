@@ -15,7 +15,6 @@ void TexGenBuffer(struct MaggieTransVertex *dstVtx, struct MaggieVertex *vtx, UW
 	{
 		case MAG_DRAWMODE_TEXGEN_UV :
 		{
-			TextOut(lib, "uv");
 			for(int i = 0; i < nVerts; ++i)
 			{
 				for(int j = 0; j < MAGGIE_MAX_TEXCOORDS; ++j)
@@ -28,7 +27,6 @@ void TexGenBuffer(struct MaggieTransVertex *dstVtx, struct MaggieVertex *vtx, UW
 		} break;
 		case MAG_DRAWMODE_TEXGEN_POS :
 		{
-			TextOut(lib, "pos");
 			for(int i = 0; i < nVerts; ++i)
 			{
 				for(int j = 0; j < MAGGIE_MAX_TEXCOORDS; ++j)
@@ -41,7 +39,6 @@ void TexGenBuffer(struct MaggieTransVertex *dstVtx, struct MaggieVertex *vtx, UW
 		} break;
 		case MAG_DRAWMODE_TEXGEN_NORMAL :
 		{
-			TextOut(lib, "normal");
 			for(int i = 0; i < nVerts; ++i)
 			{
 				for(int j = 0; j < MAGGIE_MAX_TEXCOORDS; ++j)
@@ -54,7 +51,6 @@ void TexGenBuffer(struct MaggieTransVertex *dstVtx, struct MaggieVertex *vtx, UW
 		} break;
 		case MAG_DRAWMODE_TEXGEN_REFLECT :
 		{
-//			TextOut(lib, "reflect");
 			for(int i = 0; i < nVerts; ++i)
 			{
 				vec3 viewPos, viewDir;

@@ -315,6 +315,8 @@ void magSetLightColour(REG(d0, UWORD light), REG(d1, ULONG colour), REG(a6, Magg
 
 ULONG GetTextureMipMapSize(UWORD texSize);
 ULONG GetTextureSize(UWORD texSize);
+ULONG GetTexturePixelWidth(UWORD texSize);
+ULONG GetTexturePixelHeight(UWORD texSize);
 ULONG GetTextureMipMapOffset(UWORD topLevel, UWORD mipmap);
 APTR GetTextureData(ULONG *mem);
 

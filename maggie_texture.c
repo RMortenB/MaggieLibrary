@@ -14,6 +14,33 @@ ULONG GetTextureMipMapSize(UWORD texSize)
 
 /*****************************************************************************/
 
+ULONG GetTexturePixelWidth(UWORD texSize)
+{
+	switch(texSize)
+	{
+		case 9 : return 512;
+		case 8 : return 256;
+		case 7 : return 128;
+		case 6 : return 64;
+	}
+	return 0;
+}
+
+/*****************************************************************************/
+
+ULONG GetTexturePixelHeight(UWORD texSize)
+{
+	switch(texSize)
+	{
+		case 9 : return 512;
+		case 8 : return 256;
+		case 7 : return 128;
+		case 6 : return 64;
+	}
+	return 0;
+}
+/*****************************************************************************/
+
 ULONG GetTextureSize(UWORD texSize)
 {
 	switch(texSize)
@@ -81,6 +108,198 @@ UWORD magAllocateTexture(REG(d0, UWORD size), REG(a6, MaggieBase *lib))
 
 /*****************************************************************************/
 
+typedef struct
+{
+	UWORD col0;
+	UWORD col1;
+	ULONG pixels;
+} DXTBlock;
+
+/*****************************************************************************/
+
+#define MinVal(a,b) (((a) < (b)) ? (a) : (b))
+#define MaxVal(a,b) (((a) > (b)) ? (a) : (b))
+
+/*****************************************************************************/
+
+UWORD RGBTo16Bit(ULONG rgb)
+{
+	return ((rgb >> 8) & 0xf800) | ((rgb >> 5) & 0x07e0) | ((rgb >> 3) & 0x001f);
+}
+
+/*****************************************************************************/
+
+ULONG BSwap32(ULONG val)
+{
+	return (val >> 24) | ((val >> 8) & 0x0000ff00) | ((val << 8) & 0x00ff0000) | (val << 24);
+}
+
+/*****************************************************************************/
+
+UWORD BSwap16(UWORD val)
+{
+	return (val >> 8) | (val << 8);
+}
+
+/*****************************************************************************/
+
+static int Sqr(int a)
+{
+	return a * a;
+}
+
+/*****************************************************************************/
+
+static float QuantizeBlock(DXTBlock *block, UBYTE *src, int width, int pixelSize, int rVec, int gVec, int bVec, int rOrigo, int gOrigo, int bOrigo, float ooLenSq)
+{
+	float error = 0.0f;
+
+	int rCols[4];
+	int gCols[4];
+	int bCols[4];
+
+	rCols[0] = ((block->col0 >> 8) & 0xf8);// | (block->col0 >> 13);
+	gCols[0] = ((block->col0 >> 3) & 0xfc);// | ((block->col0 >> 11) & 0x03);
+	bCols[0] = ((block->col0 << 3) & 0xf8);// | ((block->col0 >> 2) & 0x07);
+	rCols[1] = ((block->col1 >> 8) & 0xf8);// | (block->col1 >> 13);
+	gCols[1] = ((block->col1 >> 3) & 0xfc);// | ((block->col1 >> 11) & 0x03);
+	bCols[1] = ((block->col1 << 3) & 0xf8);// | ((block->col1 >> 2) & 0x07);
+	rCols[2] = (rCols[0] * 2 + rCols[1]) / 3;
+	gCols[2] = (gCols[0] * 2 + gCols[1]) / 3;
+	bCols[2] = (bCols[0] * 2 + bCols[1]) / 3;
+	rCols[3] = (rCols[0] + rCols[1] * 2) / 3;
+	gCols[3] = (gCols[0] + gCols[1] * 2) / 3;
+	bCols[3] = (bCols[0] + bCols[1] * 2) / 3;
+
+	for(int i = 0; i < 4; ++i)
+	{
+		for(int j = 0; j < 4; ++j)
+		{
+			int r = src[(i * width + j) * pixelSize + 0];
+			int g = src[(i * width + j) * pixelSize + 1];
+			int b = src[(i * width + j) * pixelSize + 2];
+
+			float dotProd = ((r - rOrigo) * rVec + (g - gOrigo) * gVec + (b - bOrigo) * bVec) * ooLenSq;
+			int pixVal = 0;
+
+			if(dotProd < (1.0f / 6.0f))
+			{
+				pixVal = 1;
+			}
+			else if(dotProd < (3.0f / 6.0f))
+			{
+				pixVal = 3;
+			}
+			else if(dotProd < (5.0f / 6.0f))
+			{
+				pixVal = 2;
+			}
+			error += Sqr(r - rCols[pixVal]) + Sqr(g - gCols[pixVal]) + Sqr(b - bCols[pixVal]);
+			block->pixels |= pixVal << (((i) * 4 + j) * 2);
+		}
+	}
+	return error;
+}
+
+/*****************************************************************************/
+
+void CompressRGB(UBYTE *dst, UBYTE *src, int width, int height, int pixelSize, int quality, MaggieBase *lib)
+{
+	DXTBlock *block = (DXTBlock *)dst;
+	for(int y = 0; y < height; y += 4)
+	{
+		for(int x = 0; x < width; x += 4)
+		{
+			int bMin = 255;
+			int gMin = 255;
+			int rMin = 255;
+			int bMax = 0;
+			int gMax = 0;
+			int rMax = 0;
+			for(int i = 0; i < 4; ++i)
+			{
+				for(int j = 0; j < 4; ++j)
+				{
+					int r = src[((y + i) * width + x + j) * pixelSize + 0];
+					int g = src[((y + i) * width + x + j) * pixelSize + 1];
+					int b = src[((y + i) * width + x + j) * pixelSize + 2];
+					rMin = MinVal(rMin, r);
+					gMin = MinVal(gMin, g);
+					bMin = MinVal(bMin, b);
+					rMax = MaxVal(rMax, r);
+					gMax = MaxVal(gMax, g);
+					bMax = MaxVal(bMax, b);
+				}
+			}
+
+			int rVec = rMax - rMin;
+			int gVec = gMax - gMin;
+			int bVec = bMax - bMin;
+			float lenSq = bVec * bVec + gVec * gVec + rVec * rVec;
+
+			block->col0 = RGBTo16Bit((rMax << 16) | (gMax << 8) | bMax);
+			block->col1 = RGBTo16Bit((rMin << 16) | (gMin << 8) | bMin);
+			block->pixels = 0;
+
+			if(lenSq > 0.0f)
+			{
+				float ooLenSq = 1.0f / lenSq;
+
+				float error;
+				float lowestError;
+
+				lowestError = QuantizeBlock(block, &src[(y * width + x) * pixelSize], width, pixelSize, rVec, gVec, bVec, rMin, gMin, bMin, ooLenSq);
+				if(quality)
+				{
+					DXTBlock testBlk;
+					testBlk.col0 = RGBTo16Bit((rMax << 16) | (gMax << 8) | bMin);
+					testBlk.col1 = RGBTo16Bit((rMin << 16) | (gMin << 8) | bMax);
+					testBlk.pixels = 0;
+					error = QuantizeBlock(&testBlk, &src[(y * width + x) * pixelSize], width, pixelSize, rVec, gVec, -bVec, rMin, gMin, bMax, ooLenSq);
+					if(lowestError > error)
+					{
+						lowestError = error;
+						*block = testBlk;
+					}
+
+					testBlk.col0 = RGBTo16Bit((rMax << 16) | (gMin << 8) | bMax);
+					testBlk.col1 = RGBTo16Bit((rMin << 16) | (gMax << 8) | bMin);
+					testBlk.pixels = 0;
+					error = QuantizeBlock(&testBlk, &src[(y * width + x) * pixelSize], width, pixelSize, rVec, -gVec, bVec, rMin, gMax, bMin, ooLenSq);
+					if(lowestError > error)
+					{
+						lowestError = error;
+						*block = testBlk;
+					}
+
+					testBlk.col0 = RGBTo16Bit((rMax << 16) | (gMin << 8) | bMin);
+					testBlk.col1 = RGBTo16Bit((rMin << 16) | (gMax << 8) | bMax);
+					testBlk.pixels = 0;
+					error = QuantizeBlock(&testBlk, &src[(y * width + x) * pixelSize], width, pixelSize, rVec, -gVec, -bVec, rMin, gMax, bMax, ooLenSq);
+					if(lowestError > error)
+					{
+						lowestError = error;
+						*block = testBlk;
+					}
+				}
+				if(block->col0 < block->col1)
+				{
+					UWORD tmp = block->col0;
+					block->col0 = block->col1;
+					block->col1 = tmp;
+					block->pixels ^= 0x55555555;
+				}
+			}
+			block->pixels = BSwap32(block->pixels);
+			block->col0 = BSwap16(block->col0);
+			block->col1 = BSwap16(block->col1);
+			block++;
+		}
+	}
+}
+
+/*****************************************************************************/
+
 void magUploadTexture(REG(d0, UWORD txtr), REG(d1, UWORD mipmap), REG(a0, APTR data), REG(d2, UWORD format), REG(a6, MaggieBase *lib))
 {
 	ULONG *mem = lib->textures[txtr];
@@ -98,7 +317,7 @@ void magUploadTexture(REG(d0, UWORD txtr), REG(d1, UWORD mipmap), REG(a0, APTR d
 	UBYTE *dst = ((UBYTE *)&mem[2]) + mipmapOffset;
 	UBYTE *src = (UBYTE *)data;
 
-	switch(format)
+	switch(format & MAG_TEXFMT_MASK)
 	{
 		case MAG_TEXFMT_DXT1 :
 		{
@@ -109,11 +328,11 @@ void magUploadTexture(REG(d0, UWORD txtr), REG(d1, UWORD mipmap), REG(a0, APTR d
 		} break;
 		case MAG_TEXFMT_RGB :
 		{
-			//CompressRGB(dst, src, mipmapSize);
+			CompressRGB(dst, src, GetTexturePixelWidth(mipmap), GetTexturePixelHeight(mipmap), 3, format & MAG_TEXCOMP_HQ, lib);
 		} break;
 		case MAG_TEXFMT_RGBA :
 		{
-			//CompressRGBA(dst, src, mipmapSize);
+			CompressRGB(dst, src, GetTexturePixelWidth(mipmap), GetTexturePixelHeight(mipmap), 4, format & MAG_TEXCOMP_HQ, lib);
 		} break;
 	}
 }
