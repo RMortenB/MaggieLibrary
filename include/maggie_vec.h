@@ -147,6 +147,19 @@ static float vec3_normalise(vec3 *res, const vec3 *v)
 
 /*****************************************************************************/
 
+static float vec3_normaliseApprox(vec3 *res, const vec3 *v)
+{
+	float oolen = mag_rsqrtf(vec3_dot(v, v));
+
+	res->x = v->x * oolen;
+	res->y = v->y * oolen;
+	res->z = v->z * oolen;
+
+	return oolen;
+}
+
+/*****************************************************************************/
+
 static void vec3_min(vec3 *res, const vec3 *a, const vec3 *b)
 {
 	res->x = a->x < b->x ? a->x : b->x;
@@ -370,6 +383,26 @@ static void mat4_perspective(mat4 *res, float fov, float aspect, float znear, fl
 
 /*****************************************************************************/
 
+static void mat4_gluPerspective(mat4 *res, float fov, float aspect, float znear, float zfar)
+{
+	float w, h;
+
+	fov *= 0.5f * 3.1415927f / 180.0f;
+	w = (float)cos(fov) / (float)sin(fov);
+	h = w / aspect;
+
+	mat4_identity(res);
+	res->m[0][0] = w;
+	res->m[1][1] = -h;
+
+	res->m[2][2] = zfar / (zfar - znear);
+	res->m[3][2] = -znear * zfar / (zfar - znear);
+	res->m[2][3] = 1.0f;
+	res->m[3][3] = 0.0f;
+}
+
+/*****************************************************************************/
+
 static void mat4_inverseLight(mat4 *res, const mat4 *mat)
 {
 	int i, j;
@@ -390,6 +423,68 @@ static void mat4_inverseLight(mat4 *res, const mat4 *mat)
 		}
 	}
 	res->m[3][3] = 1.0f;
+}
+
+/*****************************************************************************/
+
+static int mat4_inverse(mat4 *res, const mat4 *mat)
+{
+	mat4 a = *mat;
+	mat4 b;
+	mat4_identity(&b);
+
+	for(int j = 0; j < 4; ++j)
+	{
+		int i1 = j;
+
+		for(int i = j + 1; i < 4; ++i)
+			if (fabsf(a.m[i][j]) > fabsf(a.m[i1][j]))
+				i1 = i;
+
+		float tmp[4];
+
+		tmp[0] = a.m[i1][0]; tmp[1] = a.m[i1][1]; tmp[2] = a.m[i1][2]; tmp[3] = a.m[i1][3];
+		a.m[i1][0] = a.m[j][0]; a.m[i1][1] = a.m[j][1]; a.m[i1][2] = a.m[j][2]; a.m[i1][3] = a.m[j][3];
+		a.m[j][0] = tmp[0]; a.m[j][1] = tmp[1]; a.m[j][2] = tmp[2]; a.m[j][3] = tmp[3];
+
+		tmp[0] = b.m[i1][0]; tmp[1] = b.m[i1][1]; tmp[2] = b.m[i1][2]; tmp[3] = b.m[i1][3];
+		b.m[i1][0] = b.m[j][0]; b.m[i1][1] = b.m[j][1]; b.m[i1][2] = b.m[j][2]; b.m[i1][3] = b.m[j][3];
+		b.m[j][0] = tmp[0]; b.m[j][1] = tmp[1]; b.m[j][2] = tmp[2]; b.m[j][3] = tmp[3];
+
+		if (a.m[j][j] == 0.0f)
+			return 0;
+
+		float ooDiv = 1.0f / a.m[j][j];
+
+		for(int i = 0; i < 4; ++i)
+		{
+			b.m[j][i] *= ooDiv;
+			a.m[j][i] *= ooDiv;
+		}
+
+		for (int i = 0; i < 4; ++i)
+		{
+			if (i != j)
+			{
+				float veca[4];
+				float vecb[4];
+
+				for(int k = 0; k < 4; ++k)
+				{
+					veca[k] = a.m[i][j] * a.m[j][k];
+					vecb[k] = a.m[i][j] * b.m[j][k];
+				}
+
+				for(int k = 0; k < 4; ++k)
+				{
+					a.m[i][k] -= veca[k];
+					b.m[i][k] -= vecb[k];
+				}
+			}
+		}
+	}
+	*res = b;
+	return 1;
 }
 
 /*****************************************************************************/
