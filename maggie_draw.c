@@ -478,15 +478,15 @@ void magDrawTriangles(REG(d0, UWORD startVtx), REG(d1, UWORD nVerts), REG(a6, Ma
 
 	TransformVertexBuffer(transVtx, vtx, nVerts, lib);
 
-	if(lib->drawMode & MAG_DRAWMODE_LIGHTING)
-		LightBuffer(transVtx, vtx, nVerts, lib);
-
-	TexGenBuffer(transVtx, vtx, nVerts, lib);
-
 	int clipRes = ComputeClipCodes(clipCodes, transVtx, nVerts);
 
 	if(clipRes == CLIPPED_OUT)
 		return;
+
+	if(lib->drawMode & MAG_DRAWMODE_LIGHTING)
+		LightBuffer(transVtx, vtx, nVerts, lib);
+
+	TexGenBuffer(transVtx, vtx, nVerts, lib);
 
 	struct GfxBase *GfxBase = lib->gfxBase;
 	OwnBlitter();
@@ -613,7 +613,10 @@ void magDrawIndexedPolygons(REG(d0, UWORD startVtx), REG(d1, UWORD nVerts), REG(
 	if(lib->drawMode & MAG_DRAWMODE_LIGHTING)
 		LightBuffer(&transVtx[startVtx], &vtx[startVtx], nVerts, lib);
 
-	TexGenBuffer(&transVtx[startVtx], &vtx[startVtx], nVerts, lib);
+	if(lib->txtrIndex != 0xffff)
+	{
+		TexGenBuffer(&transVtx[startVtx], &vtx[startVtx], nVerts, lib);
+	}
 
 	int clipRes = ComputeClipCodes(&clipCodes[startVtx], &transVtx[startVtx], nVerts);
 
