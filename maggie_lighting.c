@@ -77,6 +77,9 @@ void magSetLightColour(REG(d0, UWORD light), REG(d1, ULONG colour), REG(a6, Magg
 
 void LightBuffer(struct MaggieTransVertex *dest, struct MaggieVertex *src, int nVerts, MaggieBase *lib)
 {
+#if PROFILE
+	ULONG lightStart = GetClocks();
+#endif
 	for(int i = 0; i < nVerts; ++i)
 	{
 		dest[i].colour = 0;
@@ -166,6 +169,9 @@ void LightBuffer(struct MaggieTransVertex *dest, struct MaggieVertex *src, int n
 		if(dest[i].colour > 0xffff)
 			dest[i].colour = 0xffff;
 	}
+#if PROFILE
+	lib->profile.light += GetClocks() - lightStart;
+#endif
 }
 
 /*****************************************************************************/

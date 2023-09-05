@@ -150,26 +150,25 @@ static int Sqr(int a)
 
 /*****************************************************************************/
 
-static float QuantizeBlock(DXTBlock *block, UBYTE *src, int width, int pixelSize, int rVec, int gVec, int bVec, int rOrigo, int gOrigo, int bOrigo, float ooLenSq)
+static float QuantizeBlock3(DXTBlock *block, UBYTE *src, int width, int pixelSize, int rVec, int gVec, int bVec, int rOrigo, int gOrigo, int bOrigo, float ooLenSq)
 {
 	float error = 0.0f;
 
-	int rCols[4];
-	int gCols[4];
-	int bCols[4];
+	int rCols[3];
+	int gCols[3];
+	int bCols[3];
 
-	rCols[0] = ((block->col0 >> 8) & 0xf8);// | (block->col0 >> 13);
-	gCols[0] = ((block->col0 >> 3) & 0xfc);// | ((block->col0 >> 11) & 0x03);
-	bCols[0] = ((block->col0 << 3) & 0xf8);// | ((block->col0 >> 2) & 0x07);
-	rCols[1] = ((block->col1 >> 8) & 0xf8);// | (block->col1 >> 13);
-	gCols[1] = ((block->col1 >> 3) & 0xfc);// | ((block->col1 >> 11) & 0x03);
-	bCols[1] = ((block->col1 << 3) & 0xf8);// | ((block->col1 >> 2) & 0x07);
-	rCols[2] = (rCols[0] * 2 + rCols[1]) / 3;
-	gCols[2] = (gCols[0] * 2 + gCols[1]) / 3;
-	bCols[2] = (bCols[0] * 2 + bCols[1]) / 3;
-	rCols[3] = (rCols[0] + rCols[1] * 2) / 3;
-	gCols[3] = (gCols[0] + gCols[1] * 2) / 3;
-	bCols[3] = (bCols[0] + bCols[1] * 2) / 3;
+	rCols[0] = ((block->col0 >> 8) & 0xf8);
+	gCols[0] = ((block->col0 >> 3) & 0xfc);
+	bCols[0] = ((block->col0 << 3) & 0xf8);
+	rCols[1] = ((block->col1 >> 8) & 0xf8);
+	gCols[1] = ((block->col1 >> 3) & 0xfc);
+	bCols[1] = ((block->col1 << 3) & 0xf8);
+	rCols[2] = (rCols[0] + rCols[1]) / 2;
+	gCols[2] = (gCols[0] + gCols[1]) / 2;
+	bCols[2] = (bCols[0] + bCols[1]) / 2;
+
+	block->pixels = 0;
 
 	for(int i = 0; i < 4; ++i)
 	{
@@ -182,15 +181,66 @@ static float QuantizeBlock(DXTBlock *block, UBYTE *src, int width, int pixelSize
 			float dotProd = ((r - rOrigo) * rVec + (g - gOrigo) * gVec + (b - bOrigo) * bVec) * ooLenSq;
 			int pixVal = 0;
 
-			if(dotProd < (1.0f / 6.0f))
+			if(dotProd < (1.0f / 3.0f))
 			{
 				pixVal = 1;
 			}
-			else if(dotProd < (3.0f / 6.0f))
+			else if(dotProd < (2.0f / 3.0f))
+			{
+				pixVal = 2;
+			}
+			error += Sqr(r - rCols[pixVal]) + Sqr(g - gCols[pixVal]) + Sqr(b - bCols[pixVal]);
+			block->pixels |= pixVal << (((i) * 4 + j) * 2);
+		}
+	}
+	return error;
+}
+
+/*****************************************************************************/
+
+static float QuantizeBlock4(DXTBlock *block, UBYTE *src, int width, int pixelSize, int rVec, int gVec, int bVec, int rOrigo, int gOrigo, int bOrigo, float ooLenSq)
+{
+	float error = 0.0f;
+
+	float rCols[4];
+	float gCols[4];
+	float bCols[4];
+
+	rCols[0] = ((block->col0 >> 8) & 0xf8);
+	gCols[0] = ((block->col0 >> 3) & 0xfc);
+	bCols[0] = ((block->col0 << 3) & 0xf8);
+	rCols[1] = ((block->col1 >> 8) & 0xf8);
+	gCols[1] = ((block->col1 >> 3) & 0xfc);
+	bCols[1] = ((block->col1 << 3) & 0xf8);
+	rCols[2] = (rCols[0] * 10.0f + rCols[1] * 6.0f) / 16.0f;
+	gCols[2] = (gCols[0] * 10.0f + gCols[1] * 6.0f) / 16.0f;
+	bCols[2] = (bCols[0] * 10.0f + bCols[1] * 6.0f) / 16.0f;
+	rCols[3] = (rCols[0] * 6.0f + rCols[1] * 10.0f) / 16.0f;
+	gCols[3] = (gCols[0] * 6.0f + gCols[1] * 10.0f) / 16.0f;
+	bCols[3] = (bCols[0] * 6.0f + bCols[1] * 10.0f) / 16.0f;
+
+	block->pixels = 0;
+
+	for(int i = 0; i < 4; ++i)
+	{
+		for(int j = 0; j < 4; ++j)
+		{
+			int r = src[(i * width + j) * pixelSize + 0];
+			int g = src[(i * width + j) * pixelSize + 1];
+			int b = src[(i * width + j) * pixelSize + 2];
+
+			float dotProd = ((r - rOrigo) * rVec + (g - gOrigo) * gVec + (b - bOrigo) * bVec) * ooLenSq;
+			int pixVal = 0;
+
+			if(dotProd < (3.0f / 16.0f))
+			{
+				pixVal = 1;
+			}
+			else if(dotProd < (1.0f / 2.0f))
 			{
 				pixVal = 3;
 			}
-			else if(dotProd < (5.0f / 6.0f))
+			else if(dotProd < (13.0f / 16.0f))
 			{
 				pixVal = 2;
 			}
@@ -240,54 +290,98 @@ void CompressRGB(UBYTE *dst, UBYTE *src, int width, int height, int pixelSize, i
 			block->col0 = RGBTo16Bit((rMax << 16) | (gMax << 8) | bMax);
 			block->col1 = RGBTo16Bit((rMin << 16) | (gMin << 8) | bMin);
 			block->pixels = 0;
-
+			int blk4 = 1;
 			if(lenSq > 0.0f)
 			{
+				float lowestError;
 				float ooLenSq = 1.0f / lenSq;
 
-				float error;
-				float lowestError;
-
-				lowestError = QuantizeBlock(block, &src[(y * width + x) * pixelSize], width, pixelSize, rVec, gVec, bVec, rMin, gMin, bMin, ooLenSq);
+				lowestError = QuantizeBlock4(block, &src[(y * width + x) * pixelSize], width, pixelSize, rVec, gVec, bVec, rMin, gMin, bMin, ooLenSq);
 				if(quality)
 				{
+					float error;
 					DXTBlock testBlk;
-					testBlk.col0 = RGBTo16Bit((rMax << 16) | (gMax << 8) | bMin);
-					testBlk.col1 = RGBTo16Bit((rMin << 16) | (gMin << 8) | bMax);
+					testBlk.col0 = RGBTo16Bit((rMax << 16) | (gMax << 8) | bMax);
+					testBlk.col1 = RGBTo16Bit((rMin << 16) | (gMin << 8) | bMin);
 					testBlk.pixels = 0;
-					error = QuantizeBlock(&testBlk, &src[(y * width + x) * pixelSize], width, pixelSize, rVec, gVec, -bVec, rMin, gMin, bMax, ooLenSq);
+					error = QuantizeBlock3(&testBlk, &src[(y * width + x) * pixelSize], width, pixelSize, rVec, gVec, bVec, rMin, gMin, bMin, ooLenSq);
 					if(lowestError > error)
 					{
 						lowestError = error;
 						*block = testBlk;
+						blk4 = 0;
+					}
+
+					testBlk.col0 = RGBTo16Bit((rMax << 16) | (gMax << 8) | bMin);
+					testBlk.col1 = RGBTo16Bit((rMin << 16) | (gMin << 8) | bMax);
+					error = QuantizeBlock4(&testBlk, &src[(y * width + x) * pixelSize], width, pixelSize, rVec, gVec, -bVec, rMin, gMin, bMax, ooLenSq);
+					if(lowestError > error)
+					{
+						lowestError = error;
+						*block = testBlk;
+						blk4 = 1;
+					}
+					error = QuantizeBlock3(&testBlk, &src[(y * width + x) * pixelSize], width, pixelSize, rVec, gVec, -bVec, rMin, gMin, bMax, ooLenSq);
+					if(lowestError > error)
+					{
+						lowestError = error;
+						*block = testBlk;
+						blk4 = 0;
 					}
 
 					testBlk.col0 = RGBTo16Bit((rMax << 16) | (gMin << 8) | bMax);
 					testBlk.col1 = RGBTo16Bit((rMin << 16) | (gMax << 8) | bMin);
-					testBlk.pixels = 0;
-					error = QuantizeBlock(&testBlk, &src[(y * width + x) * pixelSize], width, pixelSize, rVec, -gVec, bVec, rMin, gMax, bMin, ooLenSq);
+					error = QuantizeBlock4(&testBlk, &src[(y * width + x) * pixelSize], width, pixelSize, rVec, -gVec, bVec, rMin, gMax, bMin, ooLenSq);
 					if(lowestError > error)
 					{
 						lowestError = error;
 						*block = testBlk;
+						blk4 = 1;
+					}
+					error = QuantizeBlock3(&testBlk, &src[(y * width + x) * pixelSize], width, pixelSize, rVec, -gVec, bVec, rMin, gMax, bMin, ooLenSq);
+					if(lowestError > error)
+					{
+						lowestError = error;
+						*block = testBlk;
+						blk4 = 0;
 					}
 
 					testBlk.col0 = RGBTo16Bit((rMax << 16) | (gMin << 8) | bMin);
 					testBlk.col1 = RGBTo16Bit((rMin << 16) | (gMax << 8) | bMax);
-					testBlk.pixels = 0;
-					error = QuantizeBlock(&testBlk, &src[(y * width + x) * pixelSize], width, pixelSize, rVec, -gVec, -bVec, rMin, gMax, bMax, ooLenSq);
+					error = QuantizeBlock4(&testBlk, &src[(y * width + x) * pixelSize], width, pixelSize, rVec, -gVec, -bVec, rMin, gMax, bMax, ooLenSq);
 					if(lowestError > error)
 					{
 						lowestError = error;
 						*block = testBlk;
+						blk4 = 1;
+					}
+					error = QuantizeBlock3(&testBlk, &src[(y * width + x) * pixelSize], width, pixelSize, rVec, -gVec, -bVec, rMin, gMax, bMax, ooLenSq);
+					if(lowestError > error)
+					{
+						lowestError = error;
+						*block = testBlk;
+						blk4 = 0;
 					}
 				}
-				if(block->col0 < block->col1)
+				if(blk4)
 				{
-					UWORD tmp = block->col0;
-					block->col0 = block->col1;
-					block->col1 = tmp;
-					block->pixels ^= 0x55555555;
+					if(block->col0 < block->col1)
+					{
+						UWORD tmp = block->col0;
+						block->col0 = block->col1;
+						block->col1 = tmp;
+						block->pixels ^= 0x55555555;
+					}
+				}
+				else
+				{
+					if(block->col0 > block->col1)
+					{
+						UWORD tmp = block->col0;
+						block->col0 = block->col1;
+						block->col1 = tmp;
+						block->pixels = ((~(block->pixels >> 1)) & 0x55555555) ^ block->pixels;
+					}
 				}
 			}
 			block->pixels = BSwap32(block->pixels);

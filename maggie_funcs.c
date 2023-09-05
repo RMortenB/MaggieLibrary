@@ -273,11 +273,15 @@ void magBeginScene(REG(a6, MaggieBase *lib))
 		lib->profile.transmin = ~0;
 		lib->profile.clearmin = ~0;
 		lib->profile.framemin = ~0;
+		lib->profile.lightmin = ~0;
+		lib->profile.drawmin = ~0;
 		lib->profile.linesmax = 0;
 		lib->profile.spansmax = 0;
 		lib->profile.transmax = 0;
 		lib->profile.clearmax = 0;
 		lib->profile.framemax = 0;
+		lib->profile.lightmax = 0;
+		lib->profile.drawmax = 0;
 	}
 	lib->profile.count++;
 
@@ -285,10 +289,11 @@ void magBeginScene(REG(a6, MaggieBase *lib))
 	lib->profile.spans = 0;
 	lib->profile.trans = 0;
 	lib->profile.clear = 0;
+	lib->profile.light = 0;
+	lib->profile.draw = 0;
+	lib->profile.texgen = 0;
 	lib->profile.frame = GetClocks();
 #endif
-
-
 }
 
 /*****************************************************************************/
@@ -308,6 +313,12 @@ void magEndScene(REG(a6, MaggieBase *lib))
 		lib->profile.transmin = lib->profile.trans;
 	if(lib->profile.clearmin > lib->profile.clear)
 		lib->profile.clearmin = lib->profile.clear;
+	if(lib->profile.lightmin > lib->profile.light)
+		lib->profile.lightmin = lib->profile.light;
+	if(lib->profile.drawmin > lib->profile.draw)
+		lib->profile.drawmin = lib->profile.draw;
+	if(lib->profile.texgenmin > lib->profile.texgen)
+		lib->profile.texgenmin = lib->profile.texgen;
 
 	if(lib->profile.framemax < lib->profile.frame)
 		lib->profile.framemax = lib->profile.frame;
@@ -319,12 +330,21 @@ void magEndScene(REG(a6, MaggieBase *lib))
 		lib->profile.transmax = lib->profile.trans;
 	if(lib->profile.clearmax < lib->profile.clear)
 		lib->profile.clearmax = lib->profile.clear;
+	if(lib->profile.lightmax < lib->profile.light)
+		lib->profile.lightmax = lib->profile.light;
+	if(lib->profile.drawmax < lib->profile.draw)
+		lib->profile.drawmax = lib->profile.draw;
+	if(lib->profile.texgenmax > lib->profile.texgen)
+		lib->profile.texgenmax = lib->profile.texgen;
 
-	TextOut(lib, "Frame : (%d, %d) %d", lib->profile.framemin, lib->profile.framemax, lib->profile.frame);
-	TextOut(lib, "Lines : (%d, %d) %d", lib->profile.linesmin, lib->profile.linesmax, lib->profile.lines);
-	TextOut(lib, "Spans : (%d, %d) %d", lib->profile.spansmin, lib->profile.spansmax, lib->profile.spans);
-	TextOut(lib, "Trans : (%d, %d) %d", lib->profile.transmin, lib->profile.transmax, lib->profile.trans);
-	TextOut(lib, "Clear : (%d, %d) %d", lib->profile.clearmin, lib->profile.clearmax, lib->profile.clear);
+	TextOut(lib, "Frame  : (%d, %d) %d", lib->profile.framemin, lib->profile.framemax, lib->profile.frame);
+	TextOut(lib, "Lines  : (%d, %d) %d", lib->profile.linesmin, lib->profile.linesmax, lib->profile.lines);
+	TextOut(lib, "Spans  : (%d, %d) %d", lib->profile.spansmin, lib->profile.spansmax, lib->profile.spans);
+	TextOut(lib, "Trans  : (%d, %d) %d", lib->profile.transmin, lib->profile.transmax, lib->profile.trans);
+	TextOut(lib, "Clear  : (%d, %d) %d", lib->profile.clearmin, lib->profile.clearmax, lib->profile.clear);
+	TextOut(lib, "Light  : (%d, %d) %d", lib->profile.lightmin, lib->profile.lightmax, lib->profile.light);
+	TextOut(lib, "Draw   : (%d, %d) %d", lib->profile.drawmin, lib->profile.drawmax, lib->profile.draw);
+	TextOut(lib, "TexGen : (%d, %d) %d", lib->profile.texgenmin, lib->profile.texgenmax, lib->profile.texgen);
 #endif
 	ReleaseSemaphore(&lib->lock);
 }

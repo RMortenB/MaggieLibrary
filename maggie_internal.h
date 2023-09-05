@@ -154,6 +154,9 @@ struct MaggieBase
 		ULONG trans;
 		ULONG frame;
 		ULONG clear;
+		ULONG light;
+		ULONG draw;
+		ULONG texgen;
 
 		ULONG count;
 		ULONG linesmin;
@@ -161,11 +164,18 @@ struct MaggieBase
 		ULONG transmin;
 		ULONG clearmin;
 		ULONG framemin;
+		ULONG lightmin;
+		ULONG drawmin;
+		ULONG texgenmin;
 		ULONG linesmax;
 		ULONG spansmax;
 		ULONG transmax;
 		ULONG clearmax;
 		ULONG framemax;
+		ULONG lightmax;
+		ULONG drawmax;
+		ULONG texgenmax;
+
 	} profile;
 #endif
 };

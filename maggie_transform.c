@@ -9,15 +9,18 @@
 
 void TexGenBuffer(struct MaggieTransVertex *dstVtx, struct MaggieVertex *vtx, UWORD nVerts, MaggieBase *lib)
 {
+#if PROFILE
+	ULONG texGenStart = GetClocks();
+#endif
 	int uvMode = lib->drawMode & MAG_DRAWMODE_TEXGEN_MASK;
 
 	switch(uvMode)
 	{
 		case MAG_DRAWMODE_TEXGEN_UV :
 		{
-			for(int i = 0; i < nVerts; ++i)
+			for(UWORD i = 0; i < nVerts; ++i)
 			{
-				for(int j = 0; j < MAGGIE_MAX_TEXCOORDS; ++j)
+				for(UWORD j = 0; j < MAGGIE_MAX_TEXCOORDS; ++j)
 				{
 					dstVtx[i].tex[j].u = vtx[i].tex[j].u;
 					dstVtx[i].tex[j].v = vtx[i].tex[j].v;
@@ -27,9 +30,9 @@ void TexGenBuffer(struct MaggieTransVertex *dstVtx, struct MaggieVertex *vtx, UW
 		} break;
 		case MAG_DRAWMODE_TEXGEN_POS :
 		{
-			for(int i = 0; i < nVerts; ++i)
+			for(UWORD i = 0; i < nVerts; ++i)
 			{
-				for(int j = 0; j < MAGGIE_MAX_TEXCOORDS; ++j)
+				for(UWORD j = 0; j < MAGGIE_MAX_TEXCOORDS; ++j)
 				{
 					dstVtx[i].tex[j].u = vtx[i].pos.x * 256.0f * 65536.0f;
 					dstVtx[i].tex[j].v = vtx[i].pos.y * 256.0f * 65536.0f;
@@ -39,31 +42,39 @@ void TexGenBuffer(struct MaggieTransVertex *dstVtx, struct MaggieVertex *vtx, UW
 		} break;
 		case MAG_DRAWMODE_TEXGEN_NORMAL :
 		{
-			for(int i = 0; i < nVerts; ++i)
+			for(UWORD i = 0; i < nVerts; ++i)
 			{
-				for(int j = 0; j < MAGGIE_MAX_TEXCOORDS; ++j)
+				vec3 viewNormal;
+				vec3_tform(&viewNormal, &lib->modelView, &vtx[i].normal, 0.0f); // This is nonsense..
+				for(UWORD j = 0; j < MAGGIE_MAX_TEXCOORDS; ++j)
 				{
-					dstVtx[i].tex[j].u = (vtx[i].normal.x * 0.5 + 0.5f) * 256.0f * 65536.0f;
- 					dstVtx[i].tex[j].v = (vtx[i].normal.y * 0.5 + 0.5f) * 256.0f * 65536.0f;
+					dstVtx[i].tex[j].u = (viewNormal.x * 0.5 + 0.5f) * 256.0f * 65536.0f;
+					dstVtx[i].tex[j].v = (viewNormal.y * 0.5 + 0.5f) * 256.0f * 65536.0f;
 					dstVtx[i].tex[j].w = 1.0f;
 				}
 			}
 		} break;
 		case MAG_DRAWMODE_TEXGEN_REFLECT :
 		{
-			for(int i = 0; i < nVerts; ++i)
+			mat4 iWorld;
+			mat4_inverseLight(&iWorld, &lib->modelView);
+			vec3 camPos = { iWorld.m[3][0], iWorld.m[3][1], iWorld.m[3][2] };
+			for(UWORD i = 0; i < nVerts; ++i)
 			{
-				vec3 viewPos, viewDir;
-				vec3 viewNormal;
-				vec3 normScale;
+				vec3 viewVec;
+				vec3 viewDir;
 				vec3 reflected;
-				vec3_tform(&viewPos, &lib->modelView, &vtx[i].pos, 1.0f);
-				vec3_tform(&viewNormal, &lib->modelView, &vtx[i].normal, 0.0f);
-				vec3_normalise(&viewDir, &viewPos);
-				float VdotL = vec3_dot(&viewDir, &viewNormal);
-				vec3_scale(&normScale, &viewNormal, -VdotL * 2.0f);
-				vec3_add(&reflected, &viewDir, &normScale);
-				for(int j = 0; j < MAGGIE_MAX_TEXCOORDS; ++j)
+				vec3 viewReflected;
+				vec3 normScale;
+				vec3_sub(&viewVec, &vtx[i].pos, &camPos);
+				vec3_normaliseApprox(&viewDir, &viewVec);
+				float VdotN = vec3_dot(&viewDir, &vtx[i].normal);
+				vec3_scale(&normScale, &vtx[i].normal, VdotN * 2.0f);
+				vec3_sub(&reflected, &normScale, &viewDir);
+
+				vec3_tform(&viewReflected, &lib->modelView, &reflected, 0.0f); // This is nonsense..
+
+				for(UWORD j = 0; j < MAGGIE_MAX_TEXCOORDS; ++j)
 				{
 					dstVtx[i].tex[j].u = (reflected.x * 0.5f + 0.5f) * 256.0f * 65536.0f;
 					dstVtx[i].tex[j].v = (reflected.y * 0.5f + 0.5f) * 256.0f * 65536.0f;
@@ -72,6 +83,9 @@ void TexGenBuffer(struct MaggieTransVertex *dstVtx, struct MaggieVertex *vtx, UW
 			}
 		} break;
 	}
+#if PROFILE
+	lib->profile.texgen += GetClocks() - texGenStart;
+#endif
 }
 
 /*****************************************************************************/
@@ -99,9 +113,10 @@ void TransformVertexBuffer(struct MaggieTransVertex *dstVtx, struct MaggieVertex
 	{
 		TransformH(&dstVtx[i].pos, &vtx[i].pos);
 #else
-	for(int i = 0; i < nVerts; ++i)
+	for(UWORD i = 0; i < nVerts; ++i)
 	{
 		vec3_tformh(&dstVtx[i].pos, &lib->modelViewProj, &vtx[i].pos, 1.0f);
+		vtx[i].pos.z = -vtx[i].pos.z;
 #endif
 		dstVtx[i].colour = vtx[i].colour;
 	}
@@ -114,9 +129,9 @@ void TransformVertexBuffer(struct MaggieTransVertex *dstVtx, struct MaggieVertex
 
 void PrepareVertexBuffer(struct MaggieTransVertex *transDst, struct MaggieVertex *vtx, UWORD nVerts)
 {
-	for(int i = 0; i < nVerts; ++i)
+	for(UWORD i = 0; i < nVerts; ++i)
 	{
-		for(int j = 0; j < MAGGIE_MAX_TEXCOORDS; ++j)
+		for(UWORD j = 0; j < MAGGIE_MAX_TEXCOORDS; ++j)
 		{
 			vtx[i].tex[j].u = vtx[i].tex[j].u * 256.0f * 65536.0f;
 			vtx[i].tex[j].v = vtx[i].tex[j].v * 256.0f * 65536.0f;
