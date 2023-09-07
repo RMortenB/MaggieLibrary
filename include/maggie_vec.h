@@ -385,20 +385,15 @@ static void mat4_perspective(mat4 *res, float fov, float aspect, float znear, fl
 
 static void mat4_gluPerspective(mat4 *res, float fov, float aspect, float znear, float zfar)
 {
-	float w, h;
+	mat4_perspective(res, fov, aspect, znear, zfar);
 
-	fov *= 0.5f * 3.1415927f / 180.0f;
-	w = (float)cos(fov) / (float)sin(fov);
-	h = w / aspect;
+	mat4 flipTrans;
+	mat4_identity(&flipTrans);
 
-	mat4_identity(res);
-	res->m[0][0] = w;
-	res->m[1][1] = -h;
+	flipTrans.m[1][1] = -1.0f;
+	flipTrans.m[2][2] = -1.0f;
 
-	res->m[2][2] = zfar / (zfar - znear);
-	res->m[3][2] = -znear * zfar / (zfar - znear);
-	res->m[2][3] = 1.0f;
-	res->m[3][3] = 0.0f;
+	mat4_mul(res, res, &flipTrans);
 }
 
 /*****************************************************************************/
