@@ -116,7 +116,6 @@ void TransformVertexBuffer(struct MaggieTransVertex *dstVtx, struct MaggieVertex
 	for(UWORD i = 0; i < nVerts; ++i)
 	{
 		vec3_tformh(&dstVtx[i].pos, &lib->modelViewProj, &vtx[i].pos, 1.0f);
-		vtx[i].pos.z = -vtx[i].pos.z;
 #endif
 		dstVtx[i].colour = vtx[i].colour;
 	}
