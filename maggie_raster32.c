@@ -41,9 +41,6 @@ void DrawSpansHW32ZBuffer(ULONG * restrict pixels, UWORD * restrict zbuffer, con
 			continue;
 
 		int len = x1 - x0;
-		// len--;
-		// if(len <= 0)
-		// 	continue;
 		float oolen = 1.0f / len;
 		float xFrac0 = left[i].xPos - x0;
 		float xFrac1 = right[i].xPos - x1;
@@ -72,32 +69,74 @@ void DrawSpansHW32ZBuffer(ULONG * restrict pixels, UWORD * restrict zbuffer, con
 		float vPos = left[i].vow + preStep0 * vDDA;
 		float iPos = left[i].iow + preStep0 * iDDA;
 
-		zDDA *= PIXEL_RUN;
-		wDDA *= PIXEL_RUN;
-		uDDA *= PIXEL_RUN;
-		vDDA *= PIXEL_RUN;
-		iDDA *= PIXEL_RUN;
-
-		float w = 1.0 / wPos;
-		LONG uStart = uPos * w;
-		LONG vStart = vPos * w;
-		float zStart = zPos;
-		float iStart = iPos;
-		float ooLen = 1.0f / PIXEL_RUN;
-
-		int runLength = PIXEL_RUN;
-		if(runLength > len)
+		if(len > PIXEL_RUN)
 		{
-			runLength = len;
+			zDDA *= PIXEL_RUN;
+			wDDA *= PIXEL_RUN;
+			uDDA *= PIXEL_RUN;
+			vDDA *= PIXEL_RUN;
+			iDDA *= PIXEL_RUN;
+
+			float w = 1.0 / wPos;
+			LONG uStart = uPos * w;
+			LONG vStart = vPos * w;
+			float zStart = zPos;
+			float iStart = iPos;
+			float ooLen = 1.0f / PIXEL_RUN;
+
+			int runLength = PIXEL_RUN;
+
+			while(len > 0)
+			{
+				wPos += wDDA;
+				uPos += uDDA;
+				vPos += vDDA;
+				zPos += zDDA;
+				iPos += iDDA;
+
+				w = 1.0 / wPos;
+
+				float zEnd = zPos;
+				float iEnd = iPos;
+
+				LONG uEnd = uPos * w;
+				LONG vEnd = vPos * w;
+
+				if(len < PIXEL_RUN)
+				{
+					runLength = len;
+				}
+
+				LONG dUUuu = (LONG)((uEnd - uStart) * ooLen);
+				LONG dVVvv = (LONG)((vEnd - vStart) * ooLen);
+				LONG dZz = (LONG)((zEnd - zStart) * ooLen);
+				LONG dIi = (LONG)((iEnd - iStart) * ooLen);
+
+				DrawHardwareSpanZBuffered(dstColPtr, dstZPtr, runLength, (ULONG)zStart, uStart, vStart, (LONG)iStart, dZz, dUUuu, dVVvv, dIi);
+
+				dstColPtr += runLength;
+				dstZPtr += runLength;
+				uStart = uEnd;
+				vStart = vEnd;
+				zStart = zEnd;
+				iStart = iEnd;
+				len -= runLength;
+			}
 		}
-
-		while(len > 0)
+		else
 		{
-			wPos += wDDA;
-			uPos += uDDA;
-			vPos += vDDA;
-			zPos += zDDA;
-			iPos += iDDA;
+			float w = 1.0 / wPos;
+			LONG uStart = uPos * w;
+			LONG vStart = vPos * w;
+			float zStart = zPos;
+			float iStart = iPos;
+			float ooLen = 1.0f / len;
+
+			wPos += wDDA * len;
+			uPos += uDDA * len;
+			vPos += vDDA * len;
+			zPos += zDDA * len;
+			iPos += iDDA * len;
 
 			w = 1.0 / wPos;
 
@@ -107,25 +146,12 @@ void DrawSpansHW32ZBuffer(ULONG * restrict pixels, UWORD * restrict zbuffer, con
 			LONG uEnd = uPos * w;
 			LONG vEnd = vPos * w;
 
-			if(len <= (PIXEL_RUN * 3 / 2))
-			{
-				runLength = len;
-			}
-
 			LONG dUUuu = (LONG)((uEnd - uStart) * ooLen);
 			LONG dVVvv = (LONG)((vEnd - vStart) * ooLen);
 			LONG dZz = (LONG)((zEnd - zStart) * ooLen);
 			LONG dIi = (LONG)((iEnd - iStart) * ooLen);
 
-			DrawHardwareSpanZBuffered(dstColPtr, dstZPtr, runLength, (ULONG)zStart, uStart, vStart, (LONG)iStart, dZz, dUUuu, dVVvv, dIi);
-
-			dstColPtr += runLength;
-			dstZPtr += runLength;
-			uStart = uEnd;
-			vStart = vEnd;
-			zStart = zEnd;
-			iStart = iEnd;
-			len -= runLength;
+			DrawHardwareSpanZBuffered(dstColPtr, dstZPtr, len, (ULONG)zStart, uStart, vStart, (LONG)iStart, dZz, dUUuu, dVVvv, dIi);
 		}
 	}
 }
@@ -176,9 +202,6 @@ void DrawSpansHW32(ULONG * restrict pixels, const magEdgePos * restrict left, co
 		float vLen = right[i].vow - left[i].vow;
 		float iLen = right[i].iow - left[i].iow;
 
-		float preRatio0 = preStep0 / xLen;
-		float preRatio1 = preStep1 / xLen;
-
 		float preRatioDiff = (preStep0 - preStep1) / xLen;
 	    float corrFactor = (1.0f - preRatioDiff) * oolen;
 
@@ -192,29 +215,65 @@ void DrawSpansHW32(ULONG * restrict pixels, const magEdgePos * restrict left, co
 		float vPos = left[i].vow + preStep0 * vDDA;
 		float iPos = left[i].iow + preStep0 * iDDA;
 
-		wDDA *= PIXEL_RUN;
-		uDDA *= PIXEL_RUN;
-		vDDA *= PIXEL_RUN;
-		iDDA *= PIXEL_RUN;
-
-		float w = 1.0 / wPos;
-		LONG uStart = uPos * w;
-		LONG vStart = vPos * w;
-		float iStart = iPos;
-		float ooLen = 1.0f / PIXEL_RUN;
-
-		int runLength = PIXEL_RUN;
-		if(runLength > len)
+		if(len > PIXEL_RUN)
 		{
-			runLength = len;
+			wDDA *= PIXEL_RUN;
+			uDDA *= PIXEL_RUN;
+			vDDA *= PIXEL_RUN;
+			iDDA *= PIXEL_RUN;
+
+			int runLength = PIXEL_RUN;
+
+			float w = 1.0 / wPos;
+			LONG uStart = uPos * w;
+			LONG vStart = vPos * w;
+			float iStart = iPos;
+			float ooLen = 1.0f / PIXEL_RUN;
+
+			while(len > 0)
+			{
+				wPos += wDDA;
+				uPos += uDDA;
+				vPos += vDDA;
+				iPos += iDDA;
+
+				w = 1.0 / wPos;
+
+				float iEnd = iPos;
+
+				LONG uEnd = uPos * w;
+				LONG vEnd = vPos * w;
+
+				if(len < PIXEL_RUN)
+				{
+					runLength = len;
+				}
+
+				LONG dUUuu = (LONG)((uEnd - uStart) * ooLen);
+				LONG dVVvv = (LONG)((vEnd - vStart) * ooLen);
+				LONG dIi = (LONG)((iEnd - iStart) * ooLen);
+
+				DrawHardwareSpan(dstColPtr, runLength, uStart, vStart, (LONG)iStart, dUUuu, dVVvv, dIi);
+
+				dstColPtr += runLength;
+				uStart = uEnd;
+				vStart = vEnd;
+				iStart = iEnd;
+				len -= runLength;
+			}
 		}
-
-		while(len > 0)
+		else
 		{
-			wPos += wDDA;
-			uPos += uDDA;
-			vPos += vDDA;
-			iPos += iDDA;
+			float w = 1.0 / wPos;
+			LONG uStart = uPos * w;
+			LONG vStart = vPos * w;
+			float iStart = iPos;
+			float ooLen = 1.0f / len;
+
+			wPos += wDDA * len;
+			uPos += uDDA * len;
+			vPos += vDDA * len;
+			iPos += iDDA * len;
 
 			w = 1.0 / wPos;
 
@@ -223,22 +282,11 @@ void DrawSpansHW32(ULONG * restrict pixels, const magEdgePos * restrict left, co
 			LONG uEnd = uPos * w;
 			LONG vEnd = vPos * w;
 
-			if(len <= (PIXEL_RUN * 3 / 2))
-			{
-				runLength = len;
-			}
-
 			LONG dUUuu = (LONG)((uEnd - uStart) * ooLen);
 			LONG dVVvv = (LONG)((vEnd - vStart) * ooLen);
 			LONG dIi = (LONG)((iEnd - iStart) * ooLen);
 
-			DrawHardwareSpan(dstColPtr, runLength, uStart, vStart, (LONG)iStart, dUUuu, dVVvv, dIi);
-
-			dstColPtr += runLength;
-			uStart = uEnd;
-			vStart = vEnd;
-			iStart = iEnd;
-			len -= runLength;
+			DrawHardwareSpan(dstColPtr, len, uStart, vStart, (LONG)iStart, dUUuu, dVVvv, dIi);
 		}
 	}
 }
