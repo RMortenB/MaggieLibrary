@@ -119,6 +119,15 @@ static void vec3_scale(vec3 *res, const vec3 *v, float f)
 
 /*****************************************************************************/
 
+static void vec3_mul(vec3 *res, const vec3 *a, const vec3 *b)
+{
+	res->x = a->x * b->x;
+	res->y = a->y * b->y;
+	res->z = a->z * b->z;
+}
+
+/*****************************************************************************/
+
 static float vec3_len(const vec3 *v)
 {
 	return mag_sqrtf(vec3_dot(v, v));
