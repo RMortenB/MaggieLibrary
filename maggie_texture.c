@@ -79,7 +79,7 @@ UWORD magAllocateTexture(REG(d0, UWORD size), REG(a6, MaggieBase *lib))
 
 	ObtainSemaphore(&lib->lock);
 
-	for(int i = 0; i < MAX_INDEX_BUFFERS; ++i)
+	for(int i = 0; i < MAX_TEXTURES; ++i)
 	{
 		if(!lib->textures[i])
 		{
@@ -93,12 +93,19 @@ UWORD magAllocateTexture(REG(d0, UWORD size), REG(a6, MaggieBase *lib))
 
 	if(txtr == ~0)
 	{
-		return ~0;
+		return 0xffff;
 	}
 
 	int txtrMemSize = GetTextureSize(size) + sizeof(ULONG) * 2;
 
 	ULONG *mem = (ULONG *)AllocMem(txtrMemSize, MEMF_ANY | MEMF_CLEAR);
+	if(!mem)
+	{
+		ObtainSemaphore(&lib->lock);
+		lib->textures[txtr] = NULL;
+		ReleaseSemaphore(&lib->lock);
+		return 0xffff;
+	}
 	mem[0] = size;
 	mem[1] = txtrMemSize;
 	lib->textures[txtr] = mem;
