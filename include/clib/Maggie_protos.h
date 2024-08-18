@@ -25,6 +25,7 @@ UWORD *magGetDepthBuffer(); // This is the live depth buffer!
 void magSetWorldMatrix(float *matrix);
 void magSetViewMatrix(float *matrix);
 void magSetPerspectiveMatrix(float *matrix);
+void magScissor(UWORD x, UWORD y, UWORD width, UWORD height);
 
 /*****************************************************************************/
 

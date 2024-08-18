@@ -140,11 +140,16 @@ void DrawPolygon(struct MaggieTransVertex *vtx, int nVerts, MaggieBase *lib)
 {
 	if(nVerts < 3)
 		return;
+
 	float area = TriangleArea(&vtx[0].pos, &vtx[1].pos, &vtx[2].pos);
+	for(int i = 2; i < nVerts - 1; ++i)
+	{
+		area += TriangleArea(&vtx[0].pos, &vtx[i].pos, &vtx[i + 1].pos);
+	}
 
 	if(lib->drawMode & MAG_DRAWMODE_CULL_CCW)
 		area = -area;
-	if(area > 0.0f)
+	if(area >= 0.0f)
 		return;
 
 	int miny = vtx[0].pos.y;
@@ -177,6 +182,10 @@ void DrawIndexedPolygon(struct MaggieTransVertex *vtx, UWORD *indx, int nIndx, M
 		return;
 
 	float area = TriangleArea(&vtx[indx[0]].pos, &vtx[indx[1]].pos, &vtx[indx[2]].pos);
+	for(int i = 2; i < nIndx - 1; ++i)
+	{
+		area += TriangleArea(&vtx[indx[0]].pos, &vtx[indx[i]].pos, &vtx[indx[i + 1]].pos);
+	}
 	if(lib->drawMode & MAG_DRAWMODE_CULL_CCW)
 		area = -area;
 	if(area >= 0.0f)
@@ -238,7 +247,6 @@ void magDrawTrianglesUP(REG(a0, struct MaggieVertex *vtx), REG(d0, UWORD nVerts)
 	struct GfxBase *GfxBase = lib->gfxBase;
 
 	OwnBlitter();
-	WaitBlit();
 
 	if(clipRes == CLIPPED_IN)
 	{
@@ -304,7 +312,6 @@ void magDrawIndexedTrianglesUP(REG(a0, struct MaggieVertex *vtx), REG(d0, UWORD 
 	struct GfxBase *GfxBase = lib->gfxBase;
 
 	OwnBlitter();
-	WaitBlit();
 
 	if(clipRes == CLIPPED_IN)
 	{
@@ -378,7 +385,6 @@ void magDrawIndexedPolygonsUP(REG(a0, struct MaggieVertex *vtx), REG(d0, UWORD n
 	struct GfxBase *GfxBase = lib->gfxBase;
 
 	OwnBlitter();
-	WaitBlit();
 
 	if(clipRes == CLIPPED_IN)
 	{
@@ -490,7 +496,6 @@ void magDrawTriangles(REG(d0, UWORD startVtx), REG(d1, UWORD nVerts), REG(a6, Ma
 
 	struct GfxBase *GfxBase = lib->gfxBase;
 	OwnBlitter();
-	WaitBlit();
 
 	if(clipRes == CLIPPED_IN)
 	{
@@ -553,7 +558,6 @@ void magDrawIndexedTriangles(REG(d0, UWORD startVtx), REG(d1, UWORD nVerts), REG
 
 	struct GfxBase *GfxBase = lib->gfxBase;
 	OwnBlitter();
-	WaitBlit();
 
 	if(clipRes == CLIPPED_IN)
 	{
@@ -613,22 +617,25 @@ void magDrawIndexedPolygons(REG(d0, UWORD startVtx), REG(d1, UWORD nVerts), REG(
 
 	TransformVertexBuffer(&transVtx[startVtx], &vtx[startVtx], nVerts, lib);
 
+	int clipRes = ComputeClipCodes(&clipCodes[startVtx], &transVtx[startVtx], nVerts);
+
+	if(clipRes == CLIPPED_OUT)
+	{
+		return;
+	}
+
 	if(lib->drawMode & MAG_DRAWMODE_LIGHTING)
+	{
 		LightBuffer(&transVtx[startVtx], &vtx[startVtx], nVerts, lib);
+	}
 
 	if(lib->txtrIndex != 0xffff)
 	{
 		TexGenBuffer(&transVtx[startVtx], &vtx[startVtx], nVerts, lib);
 	}
 
-	int clipRes = ComputeClipCodes(&clipCodes[startVtx], &transVtx[startVtx], nVerts);
-
-	if(clipRes == CLIPPED_OUT)
-		return;
-
 	struct GfxBase *GfxBase = lib->gfxBase;
 	OwnBlitter();
-	WaitBlit();
 
 	if(clipRes == CLIPPED_IN)
 	{

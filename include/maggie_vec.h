@@ -67,7 +67,7 @@ static void vec3_set(vec3 *res, float x, float y, float z)
 
 /*****************************************************************************/
 
-static void vec3_neg(vec3 *res, vec3 *a)
+static void vec3_neg(vec3 *res, const vec3 *a)
 {
 	res->x = -a->x;
 	res->y = -a->y;
@@ -205,7 +205,7 @@ static void vec3_lerp(vec3 *res, const vec3 *a, const vec3 *b, float ratio)
 
 /*****************************************************************************/
 
-static void vec3_barycentric(vec3 *res, vec3 *a, vec3 *b, vec3 *c, vec3 *p)
+static void vec3_barycentric(vec3 *res, const vec3 *a, const vec3 *b, const vec3 *c, const vec3 *p)
 {
 	vec3 v0, v1, v2;
 	float d00, d01, d11, d20, d21;

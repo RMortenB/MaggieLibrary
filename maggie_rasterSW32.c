@@ -26,12 +26,21 @@ static void DrawSpanZBuffer32(ULONG *destCol, UWORD *zBuffer, int len, ULONG Zz,
 
 /*****************************************************************************/
 
-void DrawSpansSW32ZBuffer(ULONG * restrict pixels, UWORD * restrict zbuffer, const magEdgePos * restrict left, const magEdgePos * restrict right, int ylen, LONG modulo)
+void DrawSpansSW32ZBuffer(int ymin, int ymax, MaggieBase *lib)
 {
+	magEdgePos *edges = &lib->magEdge[ymin];
+	int ylen = ymax - ymin;
+	int modulo = lib->xres;
+	ULONG *pixels = ((ULONG *)lib->screen) + ymin * lib->xres;
+	UWORD *zbuffer = lib->depthBuffer + ymin * lib->xres;
+
+	int scissorLeft = lib->scissor.x0;
+	int scissorRight = lib->scissor.x1;
+
 	for(int i = 0; i < ylen; ++i)
 	{
-		int x0 = left[i].xPos;
-		int x1 = right[i].xPos;
+		int x0 = edges[i].xPosLeft;
+		int x1 = edges[i].xPosRight;
 
 		ULONG *dstColPtr = pixels + x0;
 		UWORD *dstZPtr =  &zbuffer[x0];
@@ -43,37 +52,46 @@ void DrawSpansSW32ZBuffer(ULONG * restrict pixels, UWORD * restrict zbuffer, con
 			continue;
 
 		int runLength = x1 - x0;
-		float oolen = 1.0f / runLength;
-		float xFrac0 = left[i].xPos - x0;
-		float xFrac1 = right[i].xPos - x1;
-		float preStep0 = 1.0f - xFrac0;
-		float preStep1 = 1.0f - xFrac1;
+		float xFracStart = edges[i].xPosLeft - x0;
+		float preStep = 1.0f - xFracStart;
 
-		float xLen = right[i].xPos - left[i].xPos;
-		float zLen = right[i].zow - left[i].zow;
-		float iLen = right[i].iow - left[i].iow;
+		float ooXLength = 1.0f / (edges[i].xPosRight - edges[i].xPosLeft);
 
-		float preRatioDiff = (preStep0 - preStep1) / xLen;
-	    float corrFactor = (1.0f - preRatioDiff) * oolen;
+		float zDDA = (edges[i].zowRight - edges[i].zowLeft) * ooXLength;
+		float iDDA = (edges[i].iowRight - edges[i].iowLeft) * ooXLength;
 
-		float zDDA = zLen * corrFactor;
-		float iDDA = iLen * corrFactor;
+		ULONG zPos = edges[i].zowLeft + preStep * zDDA;
+		LONG iPos = edges[i].iowLeft + preStep * iDDA;
 
-		float zPos = left[i].zow + preStep0 * zDDA;
-		float iPos = left[i].iow + preStep0 * iDDA;
+		if(x0 < scissorLeft)
+		{
+			int diff = scissorLeft - x0;
+			iPos += iDDA * diff;
+			zPos += zDDA * diff;
+			dstColPtr += diff;
+			dstZPtr += diff;
+			runLength -= diff;
 
-		DrawSpanZBuffer32(dstColPtr, dstZPtr, runLength, (ULONG)zPos, (LONG)iPos, zDDA, iDDA);
+			if(runLength <= 0)
+				continue;
+		}
+		if(x1 > scissorRight)
+		{
+			runLength -= x1 - scissorRight;
+		}
+
+		DrawSpanZBuffer32(dstColPtr, dstZPtr, runLength, zPos, iPos, zDDA, iDDA);
 	}
 }
 
 /*****************************************************************************/
 
-static unsigned int seed = 2234234;
-unsigned int rndNum()
-{
-	seed = seed * 1015871 + 1023499;
-	return seed;
-}
+// static unsigned int seed = 2234234;
+// unsigned int rndNum()
+// {
+// 	seed = seed * 1015871 + 1023499;
+// 	return seed;
+// }
 
 static void DrawSpan32(ULONG *destCol, int len, LONG Ii, LONG dIi)
 {
@@ -92,38 +110,37 @@ static void DrawSpan32(ULONG *destCol, int len, LONG Ii, LONG dIi)
 
 /*****************************************************************************/
 
-void DrawSpansSW32(ULONG * restrict pixels, const magEdgePos * restrict left, const magEdgePos * restrict right, int ylen, LONG modulo)
+void DrawSpansSW32(int ymin, int ymax, MaggieBase *lib)
 {
+	magEdgePos *edges = &lib->magEdge[ymin];
+	int ylen = ymax - ymin;
+	int modulo = lib->xres;
+	ULONG *pixels = ((ULONG *)lib->screen) + ymin * lib->xres;
+
+	int scissorLeft = lib->scissor.x0;
+	int scissorRight = lib->scissor.x1;
+
 	for(int i = 0; i < ylen; ++i)
 	{
-		int x0 = left[i].xPos;
-		int x1 = right[i].xPos;
-
-		ULONG *dstColPtr = pixels + x0;
-
-		pixels += modulo;
+		int x0 = edges[i].xPosLeft;
+		int x1 = edges[i].xPosRight;
 
 		if(x0 >= x1)
 			continue;
 
+		ULONG *dstColPtr = pixels + x0;
+		pixels += modulo;
+
 		int runLength = x1 - x0;
-		float oolen = 1.0f / runLength;
-		float xFrac0 = left[i].xPos - x0;
-		float xFrac1 = right[i].xPos - x1;
-		float preStep0 = 1.0f - xFrac0;
-		float preStep1 = 1.0f - xFrac1;
+		float xFracStart = edges[i].xPosLeft - x0;
+		float preStep = 1.0f - xFracStart;
 
-		float xLen = right[i].xPos - left[i].xPos;
-		float iLen = right[i].iow - left[i].iow;
+		float ooXLength = 1.0f / (edges[i].xPosRight - edges[i].xPosLeft);
+		float iDDA = (edges[i].iowRight - edges[i].iowLeft) * ooXLength;
 
-		float preRatioDiff = (preStep0 - preStep1) / xLen;
-	    float corrFactor = (1.0f - preRatioDiff) * oolen;
+		LONG iPos = edges[i].iowLeft + preStep * iDDA;
 
-		float iDDA = iLen * corrFactor;
-
-		float iPos = left[i].iow + preStep0 * iDDA;
-
-		DrawSpan32(dstColPtr, runLength, (LONG)iPos, iDDA);
+		DrawSpan32(dstColPtr, runLength, iPos, iDDA);
 	}
 }
 

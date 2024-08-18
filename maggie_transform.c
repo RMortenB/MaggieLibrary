@@ -106,17 +106,9 @@ void TransformVertexBuffer(struct MaggieTransVertex *dstVtx, struct MaggieVertex
 		mat4_mul(&lib->modelView, &lib->viewMatrix, &lib->worldMatrix);
 		mat4_mul(&lib->modelViewProj, &lib->perspectiveMatrix, &lib->modelView);
 	}
-#if 0
-	LoadMatrix(&lib->modelViewProj);
-
-	for(int i = 0; i < nVerts; ++i)
-	{
-		TransformH(&dstVtx[i].pos, &vtx[i].pos);
-#else
 	for(UWORD i = 0; i < nVerts; ++i)
 	{
 		vec3_tformh(&dstVtx[i].pos, &lib->modelViewProj, &vtx[i].pos, 1.0f);
-#endif
 		dstVtx[i].colour = vtx[i].colour;
 	}
 #if PROFILE
@@ -171,4 +163,22 @@ void magSetPerspectiveMatrix(REG(a0, float *matrix), REG(a6, MaggieBase *lib))
 
 /*****************************************************************************/
 
+void magScissor(REG(d0, UWORD x0), REG(d1, UWORD y0), REG(d2, UWORD x1), REG(d3, UWORD y1), REG(a6, MaggieBase *lib))
+{
+	if(x0 < 0)
+		x0 = 0;
+	if(y0 < 0)
+		y0 = 0;
+	if(x1 >= lib->xres)
+		x1 = lib->xres - 1;
+	if(y1 >= lib->yres)
+		y1 = lib->yres - 1;
+
+	lib->scissor.x0 = x0;
+	lib->scissor.y0 = y0;
+	lib->scissor.x1 = x1;
+	lib->scissor.y1 = y1;
+}
+
+/*****************************************************************************/
 

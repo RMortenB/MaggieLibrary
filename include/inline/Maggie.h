@@ -197,4 +197,8 @@
 	LP1NR(0x126, magClearDepth, UWORD, depth, d0, \
 	, MAGGIE_BASE_NAME)
 
+#define magScissor(x0, y0, x1, y1) \
+	LP4NR(0x12c, magScissor, UWORD, x0, d0, UWORD, y0, d1, UWORD, x1, d2, UWORD, y1, d3, \
+	, MAGGIE_BASE_NAME)
+
 #endif /*  _INLINE_MAGGIE_H  */

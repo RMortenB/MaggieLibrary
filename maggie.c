@@ -3,13 +3,13 @@
 
 #include "maggie_internal.h"
 
-
 int cliReturn()
 {
 	return -1;
 }
 
 const struct Resident romTag;
+
 
 static APTR maggieInit(int segList __asm("a0"), MaggieBase *lib __asm("d0"), struct ExecBase *sysBase __asm("a6"));
 
@@ -45,11 +45,15 @@ static LONG maggieExpunge(MaggieBase *lib __asm("a6"))
 
 	for(int i = 0; i < MAX_TEXTURES; ++i)
 	{
-		ULONG *mem = lib->textures[i];
-		if(mem)
+		magTexture *texture = lib->textures[i];
+		if(texture)
 		{
-			FreeMem(mem, mem[1]);
+			FreeMem(texture->allocPtr, texture->memSize);
 		}
+	}
+	if(lib->dummyTextureData)
+	{
+		FreeMem(lib->dummyTextureData, 16 * 16 * 8);
 	}
 
 	CloseLibrary((struct Library *)lib->gfxBase);
@@ -132,6 +136,7 @@ static APTR functionTable[] =
 	magSetLightColour,
 	magClearColour,
 	magClearDepth,
+	magScissor,
 	(APTR)-1
 };
 
@@ -154,6 +159,7 @@ static APTR maggieInit(int segList __asm("a0"), MaggieBase *lib __asm("d0"), str
 
 	lib->gfxBase = (struct GfxBase *)OpenLibrary((STRPTR)"graphics.library", 0UL);
 	lib->initialised = 1;
+	lib->hasMaggie = 1; // Todo : test for Maggie hardware
 
 	InitSemaphore(&lib->lock);
 
@@ -175,6 +181,9 @@ static APTR maggieInit(int segList __asm("a0"), MaggieBase *lib __asm("d0"), str
 	{
 		lib->textures[i] = NULL;
 	}
+
+	lib->dummyTextureData = NULL;
+
 	for(int i = 0; i < MAG_MAX_LIGHTS; ++i)
 	{
 		lib->lights[i].type = MAG_LIGHT_OFF;
@@ -190,6 +199,22 @@ static APTR maggieInit(int segList __asm("a0"), MaggieBase *lib __asm("d0"), str
 
 	lib->depthBuffer = AllocMem(MAGGIE_MAX_XRES * MAGGIE_MAX_YRES * sizeof(UWORD), MEMF_ANY | MEMF_CLEAR);
 
+#if PROFILE
+	lib->profile.linesmin = ~0;
+	lib->profile.spansmin = ~0;
+	lib->profile.transmin = ~0;
+	lib->profile.clearmin = ~0;
+	lib->profile.framemin = ~0;
+	lib->profile.lightmin = ~0;
+	lib->profile.drawmin = ~0;
+	lib->profile.linesmax = 0;
+	lib->profile.spansmax = 0;
+	lib->profile.transmax = 0;
+	lib->profile.clearmax = 0;
+	lib->profile.framemax = 0;
+	lib->profile.lightmax = 0;
+	lib->profile.drawmax = 0;
+#endif
 	return lib;
 }
 

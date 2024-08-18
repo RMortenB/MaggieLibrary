@@ -26,8 +26,8 @@ typedef UWORD PixelFormat;
 
 /*****************************************************************************/
 
-struct Library *MaggieBase;
-struct Library *CyberGfxBase;
+struct Library *CyberGfxBase = NULL;
+struct Library *MaggieBase = NULL;
 
 /*****************************************************************************/
 
@@ -129,7 +129,7 @@ int main(int argc, char *argv[])
 
 	if(!CyberGfxBase)
 	{
-		printf("Can't open lowlevel.library\n");
+		printf("Can't open cybergraphics.library\n");
 		CloseLibrary(MaggieBase);
 		CloseLibrary(LowLevelBase);
 		return 0;
@@ -252,7 +252,7 @@ int main(int argc, char *argv[])
 		magDrawIndexedPolygons(0, 6 * 4, 0, 6 * 5 - 1);
 
 		magEndScene();
-		WritePixelArray(scrPixels, 0, 0, width * 4, win->RPort, win->BorderLeft, win->BorderTop, win->Width - borderWidth, win->Height - borderHeight, RECTFMT_RGBA);
+		WritePixelArray(scrPixels, 0, 0, width * 4, win->RPort, win->BorderLeft, win->BorderTop, win->Width - borderWidth, win->Height - borderHeight, RECTFMT_ARGB);
 	}
 	CloseWindow(win);
 
@@ -263,7 +263,6 @@ int main(int argc, char *argv[])
 	magFreeIndexBuffer(iBuffer);
 
 	CloseLibrary(CyberGfxBase);
-	RemLibrary(MaggieBase);
 	CloseLibrary(MaggieBase);
 
 	return 0;

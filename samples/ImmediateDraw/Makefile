@@ -7,7 +7,7 @@ SOURCES=immediate.c
 
 ASFLAGS=-m68080 -m68881 -quiet -Fhunk
 
-CFLAGS=-std=c89 -Ofast -fomit-frame-pointer -m68080 -Wall -Wno-unused-function -DAMIGA=1 -I ../../include
+CFLAGS=-std=c11 -Ofast -fomit-frame-pointer -m68080 -Wall -Wno-unused-function -DAMIGA=1 -I ../../include
 
 LFLAGS=-L. -noixemul
 LDLIBS=-lamiga -lm

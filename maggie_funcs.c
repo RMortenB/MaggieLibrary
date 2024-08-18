@@ -8,6 +8,13 @@ void magSetScreenMemory(REG(a0, APTR *pixels), REG(d0, UWORD xres), REG(d1, UWOR
 	lib->xres = xres;
 	lib->yres = yres;
 	lib->screen = pixels;
+
+	lib->scissor.x0 = 0;
+	lib->scissor.y0 = 0;
+	lib->scissor.x1 = xres;
+	lib->scissor.y1 = yres;
+
+	lib->dirtyMatrix = 1;
 }
 
 /*****************************************************************************/
@@ -92,7 +99,7 @@ struct MaggieTransVertex *GetVBTransVertices(ULONG *mem)
 
 UWORD magAllocateVertexBuffer(REG(d0, UWORD nVerts), REG(a6, MaggieBase *lib))
 {
-	UWORD vBuffer = ~0;
+	UWORD vBuffer = 0xffff;
 
 	struct ExecBase *SysBase = lib->sysBase;
 
@@ -110,8 +117,8 @@ UWORD magAllocateVertexBuffer(REG(d0, UWORD nVerts), REG(a6, MaggieBase *lib))
 
 	ReleaseSemaphore(&lib->lock);
 
-	if(vBuffer == ~0)
-		return ~0;
+	if(vBuffer == 0xffff)
+		return 0xffff;
 	ULONG memSize = (sizeof(struct MaggieVertex) + sizeof(struct MaggieTransVertex) + sizeof(UBYTE)) * nVerts + sizeof(ULONG) * 2;
 	ULONG *mem = (ULONG *)AllocMem(memSize, MEMF_ANY | MEMF_CLEAR);
 	mem[0] = nVerts;
@@ -182,7 +189,7 @@ UWORD *GetIBIndices(ULONG *mem)
 
 UWORD magAllocateIndexBuffer(REG(d0, UWORD nIndx), REG(a6, MaggieBase *lib))
 {
-	UWORD iBuffer = ~0;
+	UWORD iBuffer = 0xffff;
 
 	struct ExecBase *SysBase = lib->sysBase;
 
@@ -200,8 +207,8 @@ UWORD magAllocateIndexBuffer(REG(d0, UWORD nIndx), REG(a6, MaggieBase *lib))
 
 	ReleaseSemaphore(&lib->lock);
 
-	if(iBuffer == ~0)
-		return ~0;
+	if(iBuffer == 0xffff)
+		return 0xffff;
 
 	ULONG *mem = (ULONG *)AllocMem(sizeof(UWORD) * nIndx + sizeof(ULONG) * 2, MEMF_ANY | MEMF_CLEAR);
 	mem[0] = nIndx;
@@ -265,26 +272,27 @@ void magBeginScene(REG(a6, MaggieBase *lib))
 	DebugReset();
 	lib->colour = 0x00ffffff;
 #if PROFILE
-	if(lib->profile.count > 10)
-	{
-		lib->profile.count = 0;
-		lib->profile.linesmin = ~0;
-		lib->profile.spansmin = ~0;
-		lib->profile.transmin = ~0;
-		lib->profile.clearmin = ~0;
-		lib->profile.framemin = ~0;
-		lib->profile.lightmin = ~0;
-		lib->profile.drawmin = ~0;
-		lib->profile.linesmax = 0;
-		lib->profile.spansmax = 0;
-		lib->profile.transmax = 0;
-		lib->profile.clearmax = 0;
-		lib->profile.framemax = 0;
-		lib->profile.lightmax = 0;
-		lib->profile.drawmax = 0;
-	}
-	lib->profile.count++;
+	// if(lib->profile.count > 10)
+	// {
+	// 	lib->profile.count = 0;
+	// 	lib->profile.linesmin = ~0;
+	// 	lib->profile.spansmin = ~0;
+	// 	lib->profile.transmin = ~0;
+	// 	lib->profile.clearmin = ~0;
+	// 	lib->profile.framemin = ~0;
+	// 	lib->profile.lightmin = ~0;
+	// 	lib->profile.drawmin = ~0;
+	// 	lib->profile.linesmax = 0;
+	// 	lib->profile.spansmax = 0;
+	// 	lib->profile.transmax = 0;
+	// 	lib->profile.clearmax = 0;
+	// 	lib->profile.framemax = 0;
+	// 	lib->profile.lightmax = 0;
+	// 	lib->profile.drawmax = 0;
+	// }
+	// lib->profile.count++;
 
+	lib->profile.nLinePixels = 0;
 	lib->profile.lines = 0;
 	lib->profile.spans = 0;
 	lib->profile.trans = 0;
@@ -337,14 +345,15 @@ void magEndScene(REG(a6, MaggieBase *lib))
 	if(lib->profile.texgenmax > lib->profile.texgen)
 		lib->profile.texgenmax = lib->profile.texgen;
 
-	TextOut(lib, "Frame  : (%d, %d) %d", lib->profile.framemin, lib->profile.framemax, lib->profile.frame);
-	TextOut(lib, "Lines  : (%d, %d) %d", lib->profile.linesmin, lib->profile.linesmax, lib->profile.lines);
-	TextOut(lib, "Spans  : (%d, %d) %d", lib->profile.spansmin, lib->profile.spansmax, lib->profile.spans);
-	TextOut(lib, "Trans  : (%d, %d) %d", lib->profile.transmin, lib->profile.transmax, lib->profile.trans);
-	TextOut(lib, "Clear  : (%d, %d) %d", lib->profile.clearmin, lib->profile.clearmax, lib->profile.clear);
-	TextOut(lib, "Light  : (%d, %d) %d", lib->profile.lightmin, lib->profile.lightmax, lib->profile.light);
-	TextOut(lib, "Draw   : (%d, %d) %d", lib->profile.drawmin, lib->profile.drawmax, lib->profile.draw);
-	TextOut(lib, "TexGen : (%d, %d) %d", lib->profile.texgenmin, lib->profile.texgenmax, lib->profile.texgen);
+	// TextOut(lib, "Frame  : (%d, %d) %d", lib->profile.framemin, lib->profile.framemax, lib->profile.frame);
+	// TextOut(lib, "Lines  : (%d, %d) %d", lib->profile.linesmin, lib->profile.linesmax, lib->profile.lines);
+	// TextOut(lib, "Spans  : (%d, %d) %d", lib->profile.spansmin, lib->profile.spansmax, lib->profile.spans);
+	// TextOut(lib, "Trans  : (%d, %d) %d", lib->profile.transmin, lib->profile.transmax, lib->profile.trans);
+	// TextOut(lib, "Clear  : (%d, %d) %d", lib->profile.clearmin, lib->profile.clearmax, lib->profile.clear);
+	// TextOut(lib, "Light  : (%d, %d) %d", lib->profile.lightmin, lib->profile.lightmax, lib->profile.light);
+	// TextOut(lib, "Draw   : (%d, %d) %d", lib->profile.drawmin, lib->profile.drawmax, lib->profile.draw);
+	// TextOut(lib, "TexGen : (%d, %d) %d", lib->profile.texgenmin, lib->profile.texgenmax, lib->profile.texgen);
+	// TextOut(lib, "Line per pixel %d (%d)", lib->profile.lines / lib->profile.nLinePixels, lib->profile.nLinePixels);
 #endif
 	ReleaseSemaphore(&lib->lock);
 }

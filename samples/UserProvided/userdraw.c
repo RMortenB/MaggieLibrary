@@ -118,18 +118,9 @@ UWORD CubeIndices[5 * 6 - 1] =
 
 int main(int argc, char *argv[])
 {
-	int i;
-	UWORD oldMode;
-	ULONG oldScreen;
 	float xangle = 0.0f;
 	float yangle = 0.0f;
-	UBYTE *screenMem;
-	UBYTE *screenPixels[NFRAMES];
 	float targetRatio = 9.0f / 16.0f;
-	mat4 worldMatrix, viewMatrix, perspective;
-	UWORD txtr;
-	APTR vblHandle;
-	int currentScreenBuffer = 0;
 
 	volatile UWORD *SAGA_ScreenModeRead = (UWORD *)0xdfe1f4;
 	volatile ULONG *SAGA_ChunkyDataRead = (ULONG *)0xdfe1ec;
@@ -152,28 +143,33 @@ int main(int argc, char *argv[])
 		return 0;
 	}
 
-	screenMem = AllocMem(SCREENSIZE * NFRAMES, MEMF_ANY | MEMF_CLEAR);
+	UBYTE *screenMem = AllocMem(SCREENSIZE * NFRAMES, MEMF_ANY | MEMF_CLEAR);
+
+	UBYTE *screenPixels[NFRAMES];
+	int currentScreenBuffer = 0;
 
 	screenPixels[0] = screenMem;
-	for(i = 1; i < NFRAMES; ++i)
+	for(int i = 1; i < NFRAMES; ++i)
 	{
 		screenPixels[i] = screenPixels[i - 1] + SCREENSIZE;
 	}
 
 	SystemControl(SCON_TakeOverSys, TRUE, TAG_DONE);
 
-	oldMode = *SAGA_ScreenModeRead;
-	oldScreen = *SAGA_ChunkyDataRead;
+	UWORD oldMode = *SAGA_ScreenModeRead;
+	ULONG oldScreen = *SAGA_ChunkyDataRead;
 
 	*SAGA_ScreenMode = MAGGIE_MODE;
+
+	mat4 worldMatrix, viewMatrix, perspective;
 
 	mat4_identity(&worldMatrix);
 	mat4_translate(&viewMatrix, 0.0f, 0.0f, 9.0f);
 	mat4_perspective(&perspective, 60.0f, targetRatio, 0.01f, 100.0f);
 
-	txtr = LoadTexture("TestTexture.dds");
+	UWORD txtr = LoadTexture("TestTexture.dds");
 
-	vblHandle = AddVBlankInt((APTR)VBLInterrupt, NULL);
+	APTR vblHandle = AddVBlankInt((APTR)VBLInterrupt, NULL);
 
 	while(!(ReadJoyPort(0) & JPF_BUTTON_RED)) /* While left mouse button not pressed */
 	{

@@ -19,9 +19,9 @@
 
 /*****************************************************************************/
 
-#define PIXEL_RUN 32
+#define PIXEL_RUN 16
 
-#define PROFILE 0
+#define PROFILE 1
 
 /*****************************************************************************/
 
@@ -29,9 +29,9 @@
 
 /*****************************************************************************/
 
-#define MAX_VERTEX_BUFFERS 1024
-#define MAX_INDEX_BUFFERS 1024
-#define MAX_TEXTURES 1024
+#define MAX_VERTEX_BUFFERS 10240
+#define MAX_INDEX_BUFFERS 10240
+#define MAX_TEXTURES 10240
 
 /*****************************************************************************/
 
@@ -41,12 +41,18 @@
 
 typedef struct
 {
-	float xPos;
-	float zow;
-	float oow;
-	float uow;
-	float vow;
-	float iow;
+	float xPosLeft;
+	float zowLeft;
+	float oowLeft;
+	float uowLeft;
+	float vowLeft;
+	float iowLeft;
+	float xPosRight;
+	float zowRight;
+	float oowRight;
+	float uowRight;
+	float vowRight;
+	float iowRight;
 } magEdgePos;
 
 /*****************************************************************************/
@@ -63,8 +69,30 @@ typedef struct
 
 /*****************************************************************************/
 
+typedef struct
+{
+	UWORD x0;
+	UWORD y0;
+	UWORD x1;
+	UWORD y1;
+} ScissorRect;
+
+/*****************************************************************************/
+
 struct MaggieBase;
 typedef struct MaggieBase MaggieBase;
+
+/*****************************************************************************/
+
+typedef struct
+{
+	ULONG texSize;
+	ULONG memSize;
+	UWORD mipMaps;
+	UWORD format;
+	UBYTE *allocPtr;
+	UBYTE data[];
+} magTexture;
 
 /*****************************************************************************/
 
@@ -74,10 +102,13 @@ struct MaggieBase
 	struct ExecBase *sysBase;
 	int segList;
 	int initialised;
+	int hasMaggie;
 
 	/*******************/
 
 	struct GfxBase *gfxBase;
+
+	/*******************/
 
 	struct SignalSemaphore lock;
 
@@ -111,6 +142,7 @@ struct MaggieBase
 	mat4 worldMatrix;
 	mat4 viewMatrix;
 	mat4 perspectiveMatrix;
+
 	mat4 modelViewProj;
 	mat4 modelView;
 	int dirtyMatrix;
@@ -135,7 +167,7 @@ struct MaggieBase
 
 	ULONG *vertexBuffers[MAX_VERTEX_BUFFERS];
 	ULONG *indexBuffers[MAX_INDEX_BUFFERS];
-	ULONG *textures[MAX_TEXTURES];
+	magTexture *textures[MAX_TEXTURES];
 
 	/*******************/
 
@@ -143,12 +175,14 @@ struct MaggieBase
 
 	/*******************/
 
-	magEdgePos magLeftEdge[MAGGIE_MAX_YRES];
-	magEdgePos magRightEdge[MAGGIE_MAX_YRES];
+	magEdgePos magEdge[MAGGIE_MAX_YRES];
+
+	ScissorRect scissor;
 
 #if PROFILE
 	struct
 	{
+		ULONG nLinePixels;
 		ULONG lines;
 		ULONG spans;
 		ULONG trans;
@@ -178,6 +212,7 @@ struct MaggieBase
 
 	} profile;
 #endif
+	APTR dummyTextureData;
 };
 
 /*****************************************************************************/
@@ -208,7 +243,7 @@ typedef struct
 
 /*****************************************************************************/
 
-static volatile MaggieRegs * const maggieRegs = (MaggieRegs *)0xdff250;
+extern volatile MaggieRegs maggieRegs;
 
 /*****************************************************************************/
 /* This is the "public section". Internal prototypes that'll go into headers */
@@ -231,6 +266,7 @@ UWORD *magGetDepthBuffer(REG(a6, MaggieBase *lib)); // This is the live depth bu
 void magSetWorldMatrix(REG(a0, float *matrix), REG(a6, MaggieBase *lib));
 void magSetViewMatrix(REG(a0, float *matrix), REG(a6, MaggieBase *lib));
 void magSetPerspectiveMatrix(REG(a0, float *matrix), REG(a6, MaggieBase *lib));
+void magScissor(REG(d0, UWORD x0), REG(d1, UWORD y0), REG(d2, UWORD x1), REG(d3, UWORD x2), REG(a6, MaggieBase *lib));
 
 /*****************************************************************************/
 
@@ -323,12 +359,18 @@ void magSetLightColour(REG(d0, UWORD light), REG(d1, ULONG colour), REG(a6, Magg
 
 // Private functions
 
-ULONG GetTextureMipMapSize(UWORD texSize);
-ULONG GetTextureSize(UWORD texSize);
+ULONG GetTextureMipMapSize(UWORD format, UWORD texSize);
+ULONG GetTextureSize(UWORD format, UWORD texSize);
 ULONG GetTexturePixelWidth(UWORD texSize);
 ULONG GetTexturePixelHeight(UWORD texSize);
-ULONG GetTextureMipMapOffset(UWORD topLevel, UWORD mipmap);
-APTR GetTextureData(ULONG *mem);
+ULONG GetTextureMipMapOffset(UWORD format, UWORD topLevel, UWORD mipmap);
+APTR GetTextureData(magTexture *txtr);
+int GetTexSizeIndex(magTexture *txtr);
+
+/*****************************************************************************/
+
+void CompressRGB(UBYTE *dst, UBYTE *src, int width, int height, int pixelSize, int quality, MaggieBase *lib);
+void DeCompressDXT1(UBYTE *dst, UBYTE *src, int width, int height, MaggieBase *lib);
 
 /*****************************************************************************/
 

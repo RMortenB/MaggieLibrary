@@ -15,7 +15,7 @@ void DrawLine(magEdgePos * restrict edge, int tex, const struct MaggieTransVerte
 	int y0 = (int)v0->pos.y;
 	int y1 = (int)v1->pos.y;
 
-	int lineLen = (int)(y1 - y0);
+	int lineLen = y1 - y0;
 
 	if(lineLen <= 0)
 		return;
@@ -24,13 +24,10 @@ void DrawLine(magEdgePos * restrict edge, int tex, const struct MaggieTransVerte
 
 	edge += y0;
 
-	float preStep0 = 1.0f + y0 - v0->pos.y;
-	float preStep1 = 1.0f + y1 - v1->pos.y;
-
-	float preRatioDiff = (preStep0 - preStep1) / (v1->pos.y - v0->pos.y);
-    float corrFactor = (1.0f - preRatioDiff) * ooLineLen;
-#if 1
-	DrawLineAsm(edge, v0, v1, corrFactor, preStep0, lineLen);
+	float preStep = 1.0f + y0 - v0->pos.y;
+    float yLen = 1.0f / (v1->pos.y - v0->pos.y);
+#if 0
+	DrawLineAsm(edge, v0, v1, yLen, preStep0, lineLen);
 #else
 	float xLen = v1->pos.x - v0->pos.x;
 	float zLen = v1->pos.z - v0->pos.z;
@@ -39,28 +36,28 @@ void DrawLine(magEdgePos * restrict edge, int tex, const struct MaggieTransVerte
 	float vLen = v1->tex[tex].v - v0->tex[tex].v;
 	int iLen = ((int)v1->colour - (int)v0->colour);
 
-	float xDDA = xLen * corrFactor;
-	float zDDA = zLen * corrFactor;
-	float wDDA = wLen * corrFactor;
-	float uDDA = uLen * corrFactor;
-	float vDDA = vLen * corrFactor;
-	float iDDA = iLen * corrFactor;
+	float xDDA = xLen * yLen;
+	float zDDA = zLen * yLen;
+	float wDDA = wLen * yLen;
+	float uDDA = uLen * yLen;
+	float vDDA = vLen * yLen;
+	float iDDA = iLen * yLen;
 
-	float xVal = v0->pos.x + preStep0 * xDDA;
-	float zow = v0->pos.z + preStep0 * zDDA;
-	float oow = v0->pos.w + preStep0 * wDDA;
-	float uow = v0->tex[tex].u + preStep0 * uDDA;
-	float vow = v0->tex[tex].v + preStep0 * vDDA;
-	float iow = (int)v0->colour + preStep0 * iDDA;
+	float xVal = v0->pos.x + preStep * xDDA;
+	float zow = v0->pos.z + preStep * zDDA;
+	float oow = v0->pos.w + preStep * wDDA;
+	float uow = v0->tex[tex].u + preStep * uDDA;
+	float vow = v0->tex[tex].v + preStep * vDDA;
+	float iow = (int)v0->colour + preStep * iDDA;
 
 	for(int i = 0; i < lineLen; ++i)
 	{
-		edge[i].xPos = xVal;
-		edge[i].zow = zow;
-		edge[i].oow = oow;
-		edge[i].uow = uow;
-		edge[i].vow = vow;
-		edge[i].iow = iow;
+		edge[i].xPosLeft = xVal;
+		edge[i].zowLeft = zow;
+		edge[i].oowLeft = oow;
+		edge[i].uowLeft = uow;
+		edge[i].vowLeft = vow;
+		edge[i].iowLeft = iow;
 		xVal += xDDA;
 		zow += zDDA;
 		oow += wDDA;
@@ -82,25 +79,26 @@ void DrawEdge(struct MaggieTransVertex *vtx0, struct MaggieTransVertex *vtx1, Ma
 	{
 		if(vtx0->pos.y <= vtx1->pos.y)
 		{
-			DrawLine(lib->magRightEdge, 0, vtx0, vtx1);
+			DrawLine((magEdgePos *)((float *)&lib->magEdge[0].xPosRight), 0, vtx0, vtx1);
 		}
 		else
 		{
-			DrawLine(lib->magLeftEdge, 0, vtx1, vtx0);
+			DrawLine(lib->magEdge, 0, vtx1, vtx0);
 		}
 	}
 	else
 	{
 		if(vtx0->pos.y <= vtx1->pos.y)
 		{
-			DrawLine(lib->magLeftEdge, 0, vtx0, vtx1);
+			DrawLine(lib->magEdge, 0, vtx0, vtx1);
 		}
 		else
 		{
-			DrawLine(lib->magRightEdge, 0, vtx1, vtx0);
+			DrawLine((magEdgePos *)((float *)&lib->magEdge[0].xPosRight), 0, vtx1, vtx0);
 		}
 	}
 #if PROFILE
 	lib->profile.lines += GetClocks() - startTime;
+	lib->profile.nLinePixels += fabs(vtx1->pos.y - vtx0->pos.y);
 #endif
 }

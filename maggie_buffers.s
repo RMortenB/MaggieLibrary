@@ -3,11 +3,15 @@
 ;	void magFastClear(void *buffer __asm("a0"), ULONG nBytes__asm("d0"), ULONG data __asm("d1"));
 
 _magFastClear:
-	vperm	#$45674567,d1,d1,e0
+;	vperm	#$45674567,d1,d1,e0
 	lsr.l	#4,d0
 .loop:
-	store	e0,(a0)+
-	store	e0,(a0)+
+	move.l	d1,(a0)+
+	move.l	d1,(a0)+
+	move.l	d1,(a0)+
+	move.l	d1,(a0)+
+;	store	e0,(a0)+
+;	store	e0,(a0)+
 	subq.l	#1,d0
 	bne.s	.loop
 	rts
@@ -80,14 +84,12 @@ _GetClocks:
 	public _GetClocks
 
 _DrawLineAsm:
-    fmovem    fp2-fp7,-(a7)
-
-    fmove.s      (a1),fp2
-    fmove.s     8(a1),fp3
-    fmove.s    12(a1),fp4
-    fmove.s    16(a1),fp5
-    fmove.s    20(a1),fp6
-    fmove.l    28(a1),fp7
+    fmove.s      (a1),e12
+    fmove.s     8(a1),e13
+    fmove.s    12(a1),e14
+    fmove.s    16(a1),e15
+    fmove.s    20(a1),e16
+    fmove.l    28(a1),e17
 
     fmove.s      (a2),e0
     fmove.s     8(a2),e1
@@ -96,12 +98,12 @@ _DrawLineAsm:
     fmove.s    20(a2),e4
     fmove.l    28(a2),e5
 
-    fsub    fp2,e0
-    fsub    fp3,e1
-    fsub    fp4,e2
-    fsub    fp5,e3
-    fsub    fp6,e4
-    fsub    fp7,e5
+    fsub    e12,e0
+    fsub    e13,e1
+    fsub    e14,e2
+    fsub    e15,e3
+    fsub    e16,e4
+    fsub    e17,e5
 
     fmul    fp0,e0
     fmul    fp0,e1
@@ -117,31 +119,31 @@ _DrawLineAsm:
     fmul    fp1,e4,e10
     fmul    fp1,e5,e11
 
-    fadd    e6,fp2
-    fadd    e7,fp3
-    fadd    e8,fp4
-    fadd    e9,fp5
-    fadd    e10,fp6
-    fadd    e11,fp7
+    fadd    e6,e12
+    fadd    e7,e13
+    fadd    e8,e14
+    fadd    e9,e15
+    fadd    e10,e16
+    fadd    e11,e17
 .loop:
-    fmove.s    fp2,(a0)+
-    fmove.s    fp3,(a0)+
-    fmove.s    fp4,(a0)+
-    fmove.s    fp5,(a0)+
-    fmove.s    fp6,(a0)+
-    fmove.s    fp7,(a0)+
+    fmove.s    e12,(a0)+
+    fmove.s    e13,(a0)+
+    fmove.s    e14,(a0)+
+    fmove.s    e15,(a0)+
+    fmove.s    e16,(a0)+
+    fmove.s    e17,(a0)+
 
-    fadd    e0,fp2
-    fadd    e1,fp3
-    fadd    e2,fp4
-    fadd    e3,fp5
-    fadd    e4,fp6
-    fadd    e5,fp7
+	fadd		e0,e12
+	fadd		e1,e13
+	fadd		e2,e14
+	fadd		e3,e15
+	fadd		e4,e16
+	fadd		e5,e17
+
+	add.l		#24,a0
 
     subq.l    #1,d0
     bne.s    .loop
-
-    fmovem    (a7)+,fp2-fp7
 
     rts
 	public _DrawLineAsm

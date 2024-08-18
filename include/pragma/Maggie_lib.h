@@ -51,6 +51,7 @@
 #pragma amicall(MaggieBase,0x11a,magSetLightColour(d0,d1))
 #pragma amicall(MaggieBase,0x120,magClearColour(d0))
 #pragma amicall(MaggieBase,0x126,magClearDepth(d0))
+#pragma amicall(MaggieBase,0x12c,magScissor(d0,d1,d2,d3))
 #endif
 #if defined(_DCC) || defined(__SASC)
 #pragma  libcall MaggieBase magSetScreenMemory     01e 10803
@@ -98,6 +99,7 @@
 #pragma  libcall MaggieBase magSetLightColour      11a 1002
 #pragma  libcall MaggieBase magClearColour         120 001
 #pragma  libcall MaggieBase magClearDepth          126 001
+#pragma  libcall MaggieBase magScissor             12c 321004
 #endif
 
 #endif	/*  _INCLUDE_PRAGMA_MAGGIE_LIB_H  */

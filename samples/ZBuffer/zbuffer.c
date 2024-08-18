@@ -4,9 +4,11 @@
 #include <proto/lowlevel.h>
 
 #include <proto/Maggie.h>
+#include <proto/cybergraphics.h>
 #include <maggie_vec.h>
 #include <maggie_vertex.h>
 #include <maggie_flags.h>
+#include <cybergraphx/cybergraphics.h>
 
 /*****************************************************************************/
 
@@ -56,7 +58,10 @@ UWORD LoadTexture(const char *filename)
 	int size;
 	FILE *fp = fopen(filename, "rb");
 	if(!fp)
+	{
+		printf("No texture %s\n", filename);
 		return 0xffff;
+	}
 
 	fseek(fp, 0, SEEK_END);
 	size = ftell(fp);
@@ -68,7 +73,7 @@ UWORD LoadTexture(const char *filename)
 	fclose(fp);
 
 	txtr = magAllocateTexture(6);
-	magUploadTexture(txtr, 6, &data[256UL * 128 + 128 * 64], 0);
+	magUploadTexture(txtr, 6, data + 256 * 128 + 128 * 64, 0);
 	FreeMem(data, size - 128);
 
 	return txtr;
@@ -125,8 +130,8 @@ UWORD CubeIndices[5 * 6 - 1] =
 
 int main(int argc, char *argv[])
 {
-	float xangle = 0.0f;
-	float yangle = 0.0f;
+	float xangle = 0.345f;
+	float yangle = 0.123f;
 	volatile UWORD *SAGA_ScreenModeRead = (UWORD *)0xdfe1f4;
 	volatile ULONG *SAGA_ChunkyDataRead = (ULONG *)0xdfe1ec;
 	volatile UWORD *SAGA_ScreenMode = (UWORD *)0xdff1f4;
@@ -157,6 +162,13 @@ int main(int argc, char *argv[])
 		return 0;
 	}
 
+	txtr = LoadTexture("TestTexture.dds");
+	if(txtr == 0xffff)
+	{
+		printf("no Load %d\n", txtr);
+		return 0;
+	}
+
 	screenMem = AllocMem(SCREENSIZE * NFRAMES, MEMF_ANY | MEMF_CLEAR);
 
 	screenPixels[0] = screenMem;
@@ -164,8 +176,6 @@ int main(int argc, char *argv[])
 	{
 		screenPixels[i] = screenPixels[i - 1] + SCREENSIZE;
 	}
-
-	txtr = LoadTexture("TestTexture.dds");
 
 	SystemControl(SCON_TakeOverSys, TRUE, TAG_DONE);
 
@@ -189,13 +199,13 @@ int main(int argc, char *argv[])
 
 	while(!(ReadJoyPort(0) & JPF_BUTTON_RED)) /* While left mouse button not pressed */
 	{
-		UWORD *pixels;
+		ULONG *pixels;
 		mat4 xRot, yRot, rotMatrix;
 
 		*SAGA_ChunkyData = (ULONG)screenPixels[currentBufferNumber];
 
 		currentBufferNumber = (currentBufferNumber + 1) % NFRAMES;
-		pixels = (UWORD *)screenPixels[currentBufferNumber];
+		pixels = (ULONG *)screenPixels[currentBufferNumber];
 
 		WaitVBLPassed();
 
@@ -204,9 +214,11 @@ int main(int argc, char *argv[])
 		mat4_mul(&rotMatrix, &xRot, &yRot);
 
 		magBeginScene();
-
+#if BPP == 2
+		magSetDrawMode(MAG_DRAWMODE_BILINEAR | MAG_DRAWMODE_LIGHTING | MAG_DRAWMODE_DEPTHBUFFER);
+#else
 		magSetDrawMode(MAG_DRAWMODE_32BIT | MAG_DRAWMODE_BILINEAR | MAG_DRAWMODE_LIGHTING | MAG_DRAWMODE_DEPTHBUFFER);
-
+#endif
 		magSetScreenMemory((APTR)pixels, XRES, YRES);
 
 		magClear(MAG_CLEAR_COLOUR | MAG_CLEAR_DEPTH);
@@ -216,9 +228,9 @@ int main(int argc, char *argv[])
 		magSetLightColour(0, 0x00ffffff);
 		magSetLightAttenuation(0, 250.0f);
 		magSetLightCone(0, 15.0f * 3.1415927f / 180.0f);
-		magSetLightType(0, MAG_LIGHT_POINT);
+		magSetLightType(0, MAG_LIGHT_SPOT);
 
-		magSetLightColour(1, 0x000f0f0f);
+		magSetLightColour(1, 0x00ffffff);
 		magSetLightType(1, MAG_LIGHT_AMBIENT);
 
 		magSetTexture(0, txtr);
@@ -263,7 +275,6 @@ int main(int argc, char *argv[])
 	FreeMem(screenMem, SCREENSIZE * NFRAMES);
 
 	CloseLibrary(LowLevelBase);
-	RemLibrary(MaggieBase);
 	CloseLibrary(MaggieBase);
 
 	return 0;

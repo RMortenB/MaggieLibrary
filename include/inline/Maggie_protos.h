@@ -140,4 +140,7 @@ void __magClearColour(__reg("a6") struct Library *, __reg("d0") ULONG colour)="\
 void __magClearDepth(__reg("a6") struct Library *, __reg("d0") UWORD depth)="\tjsr\t-294(a6)";
 #define magClearDepth(depth) __magClearDepth(MaggieBase, (depth))
 
+void __magScissor(__reg("a6") struct Library *, __reg("d0") UWORD x0, __reg("d1") UWORD y0, __reg("d2") UWORD x1, __reg("d3") UWORD y1)="\tjsr\t-300(a6)";
+#define magScissor(x0, y0, x1, y1) __magScissor(MaggieBase, (x0), (y0), (x1), (y1))
+
 #endif /*  _VBCCINLINE_MAGGIE_H  */
