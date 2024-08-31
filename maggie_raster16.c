@@ -152,7 +152,6 @@ void DrawSpansHW16ZBuffer(int ymin, int ymax, MaggieBase *lib)
 			float vDDAFullRun = vDDA * PIXEL_RUN;
 			float iDDAFullRun = iDDA * PIXEL_RUN;
 
-			float zStart = zPos;
 			float w = 1.0 / wPos;
 			LONG uStart = uPos * w;
 			LONG vStart = vPos * w;
@@ -163,7 +162,6 @@ void DrawSpansHW16ZBuffer(int ymin, int ymax, MaggieBase *lib)
 
 			while(len > PIXEL_RUN)
 			{
-				zPos += zDDAFullRun;
 				wPos += wDDAFullRun;
 				uPos += uDDAFullRun;
 				vPos += vDDAFullRun;
@@ -171,7 +169,6 @@ void DrawSpansHW16ZBuffer(int ymin, int ymax, MaggieBase *lib)
 
 				w = 1.0 / wPos;
 
-				float zEnd = zPos;
 				float iEnd = iPos;
 
 				LONG uEnd = (uPos * w);
@@ -184,16 +181,15 @@ void DrawSpansHW16ZBuffer(int ymin, int ymax, MaggieBase *lib)
 
 				LONG dUUuu = (LONG)((uEnd - uStart) * ooLen);
 				LONG dVVvv = (LONG)((vEnd - vStart) * ooLen);
-				LONG dZz = (LONG)((zEnd - zStart) * ooLen);
 				LONG dIi = (LONG)((iEnd - iStart) * ooLen);
 
-				DrawHardwareSpanZBuffered(dstColPtr, dstZPtr, runLength, (ULONG)zStart, uStart, vStart, (LONG)iStart, dZz, dUUuu, dVVvv, dIi);
+				DrawHardwareSpanZBuffered(dstColPtr, dstZPtr, runLength, (ULONG)zPos, uStart, vStart, (LONG)iStart, (LONG)zDDA, dUUuu, dVVvv, dIi);
 
 				dstColPtr += runLength;
 				dstZPtr += runLength;
+				zPos += zDDAFullRun;
 				uStart = uEnd;
 				vStart = vEnd;
-				zStart = zEnd;
 				iStart = iEnd;
 				len -= runLength;
 			}
@@ -203,7 +199,6 @@ void DrawSpansHW16ZBuffer(int ymin, int ymax, MaggieBase *lib)
 			float w = 1.0 / wPos;
 			LONG uStart = uPos * w;
 			LONG vStart = vPos * w;
-			float zStart = zPos;
 			float iStart = iPos;
 			float ooLen = 1.0f / len;
 
@@ -215,7 +210,6 @@ void DrawSpansHW16ZBuffer(int ymin, int ymax, MaggieBase *lib)
 
 			w = 1.0 / wPos;
 
-			float zEnd = zPos;
 			float iEnd = iPos;
 
 			LONG uEnd = uPos * w;
@@ -223,10 +217,9 @@ void DrawSpansHW16ZBuffer(int ymin, int ymax, MaggieBase *lib)
 
 			LONG dUUuu = (LONG)((uEnd - uStart) * ooLen);
 			LONG dVVvv = (LONG)((vEnd - vStart) * ooLen);
-			LONG dZz = (LONG)((zEnd - zStart) * ooLen);
 			LONG dIi = (LONG)((iEnd - iStart) * ooLen);
 
-			DrawHardwareSpanZBuffered(dstColPtr, dstZPtr, len, (ULONG)zStart, uStart, vStart, (LONG)iStart, dZz, dUUuu, dVVvv, dIi);
+			DrawHardwareSpanZBuffered(dstColPtr, dstZPtr, len, (ULONG)zPos, uStart, vStart, (LONG)iStart, (LONG)zDDA, dUUuu, dVVvv, dIi);
 		}
 	}
 }
