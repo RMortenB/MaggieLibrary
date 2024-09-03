@@ -25,7 +25,7 @@ void DrawLine(magEdgePos * restrict edge, int tex, const struct MaggieTransVerte
 	edge += y0;
 
 	float preStep = 1.0f + y0 - v0->pos.y;
-    float yLen = 1.0f / (v1->pos.y - v0->pos.y);
+    float ooYLen = 1.0f / (v1->pos.y - v0->pos.y);
 #if 0
 	DrawLineAsm(edge, v0, v1, yLen, preStep0, lineLen);
 #else
@@ -36,12 +36,12 @@ void DrawLine(magEdgePos * restrict edge, int tex, const struct MaggieTransVerte
 	float vLen = v1->tex[tex].v - v0->tex[tex].v;
 	int iLen = ((int)v1->colour - (int)v0->colour);
 
-	float xDDA = xLen * yLen;
-	float zDDA = zLen * yLen;
-	float wDDA = wLen * yLen;
-	float uDDA = uLen * yLen;
-	float vDDA = vLen * yLen;
-	float iDDA = iLen * yLen;
+	float xDDA = xLen * ooYLen;
+	float zDDA = zLen * ooYLen;
+	float wDDA = wLen * ooYLen;
+	float uDDA = uLen * ooYLen;
+	float vDDA = vLen * ooYLen;
+	float iDDA = iLen * ooYLen;
 
 	float xVal = v0->pos.x + preStep * xDDA;
 	float zow = v0->pos.z + preStep * zDDA;
