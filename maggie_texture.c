@@ -109,7 +109,7 @@ int GetTexSizeIndex(magTexture *txtr)
 
 UWORD magAllocateTexture(REG(d0, UWORD size), REG(a6, MaggieBase *lib))
 {
-	UWORD txtr = ~0;
+	UWORD txtr = 0xffff;
 
 	struct ExecBase *SysBase = lib->sysBase;
 

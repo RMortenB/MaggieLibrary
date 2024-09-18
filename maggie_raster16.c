@@ -37,8 +37,8 @@ static void DrawHardwareSpan(APTR dest, int len, ULONG UUuu, ULONG VVvv, UWORD I
 
 static void SetTexture(APTR txtrData, UWORD size)
 {
-	maggieRegs.texture = txtrData;
 	maggieRegs.texSize = size;
+	maggieRegs.texture = txtrData;
 }
 
 /*****************************************************************************/
@@ -46,7 +46,7 @@ static void SetTexture(APTR txtrData, UWORD size)
 static void SetupHW(MaggieBase *lib)
 {
 	UWORD mode = lib->drawMode;
-	UWORD drawMode = 0;
+	UWORD drawMode = 0x0004;
 	if(mode & MAG_DRAWMODE_BILINEAR)
 	{
 		drawMode |=  0x0001;
@@ -56,14 +56,6 @@ static void SetupHW(MaggieBase *lib)
 		drawMode |= 0x0002;
 	}
 	UWORD modulo = 2;
-	if(mode & MAG_DRAWMODE_32BIT)
-	{
-		modulo = 4;
-	}
-	else
-	{
-		drawMode |= 0x0004;
-	}
 	maggieRegs.mode = drawMode;
 	maggieRegs.modulo = modulo;
 	maggieRegs.lightRGBA = lib->colour;
@@ -105,19 +97,13 @@ void DrawSpansHW16ZBuffer(int ymin, int ymax, MaggieBase *lib)
 		float xFracStart = edges[i].xPosLeft - x0;
 		float preStep = 1.0f - xFracStart;
 
-		float zLen = edges[i].zowRight - edges[i].zowLeft;
-		float wLen = edges[i].oowRight - edges[i].oowLeft;
-		float uLen = edges[i].uowRight - edges[i].uowLeft;
-		float vLen = edges[i].vowRight - edges[i].vowLeft;
-		float iLen = edges[i].iowRight - edges[i].iowLeft;
-
 		float ooXLength = 1.0f / (edges[i].xPosRight - edges[i].xPosLeft);
 
-		float zDDA = zLen * ooXLength;
-		float wDDA = wLen * ooXLength;
-		float uDDA = uLen * ooXLength;
-		float vDDA = vLen * ooXLength;
-		float iDDA = iLen * ooXLength;
+		float zDDA = (edges[i].zowRight - edges[i].zowLeft) * ooXLength;
+		float wDDA = (edges[i].oowRight - edges[i].oowLeft) * ooXLength;
+		float uDDA = (edges[i].uowRight - edges[i].uowLeft) * ooXLength;
+		float vDDA = (edges[i].vowRight - edges[i].vowLeft) * ooXLength;
+		float iDDA = (edges[i].iowRight - edges[i].iowLeft) * ooXLength;
 
 		float zPos = edges[i].zowLeft + preStep * zDDA;
 		float wPos = edges[i].oowLeft + preStep * wDDA;
@@ -249,18 +235,12 @@ void DrawSpansHW16(int ymin, int ymax, MaggieBase *lib)
 		float xFracStart = edges[i].xPosLeft - x0;
 		float preStep = 1.0f - xFracStart;
 
-		float xLen = edges[i].xPosRight - edges[i].xPosLeft;
-		float wLen = edges[i].oowRight - edges[i].oowLeft;
-		float uLen = edges[i].uowRight - edges[i].uowLeft;
-		float vLen = edges[i].vowRight - edges[i].vowLeft;
-		float iLen = edges[i].iowRight - edges[i].iowLeft;
-
 		float ooXLength = 1.0f / (edges[i].xPosRight - edges[i].xPosLeft);
 
-		float wDDA = wLen * ooXLength;
-		float uDDA = uLen * ooXLength;
-		float vDDA = vLen * ooXLength;
-		float iDDA = iLen * ooXLength;
+		float wDDA = (edges[i].oowRight - edges[i].oowLeft) * ooXLength;
+		float uDDA = (edges[i].uowRight - edges[i].uowLeft) * ooXLength;
+		float vDDA = (edges[i].vowRight - edges[i].vowLeft) * ooXLength;
+		float iDDA = (edges[i].iowRight - edges[i].iowLeft) * ooXLength;
 
 		float wPos = edges[i].oowLeft + preStep * wDDA;
 		float uPos = edges[i].uowLeft + preStep * uDDA;

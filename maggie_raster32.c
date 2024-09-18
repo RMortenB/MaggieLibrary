@@ -104,15 +104,7 @@ static void SetupHW(MaggieBase *lib)
 	{
 		drawMode |= 0x0002;
 	}
-	UWORD modulo = 2;
-	if(mode & MAG_DRAWMODE_32BIT)
-	{
-		modulo = 4;
-	}
-	else
-	{
-		drawMode |= 0x0004;
-	}
+	UWORD modulo = 4;
 	maggieRegs.mode = drawMode;
 	maggieRegs.modulo = modulo;
 	maggieRegs.lightRGBA = lib->colour;
