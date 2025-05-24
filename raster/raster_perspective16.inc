@@ -1,7 +1,7 @@
 	sub.l	d0,d1; yLen
-	ble.w	.allDone
+	ble.w	.noVlinesToDo
 
-	movem.l	d2-d7/a2-a6,-(a7)
+	movem.l	d2-d7/a2-a4,-(a7)
 
 	move.l	d1,d7
 
@@ -9,12 +9,9 @@
 	GetXRes d2
 	mulu.w	d2,d0
 	GetScreenPtr a3
-	GetDepthPtr a4
-	GetScissorPtr a5
+	GetScissorPtr a4
 
 	lea		(a3,d0.l*.bpp),a3			;pixels
-
-	lea		(a4,d0.l*2),a4			;zbuffer
 
 	fmove.w	#1,e4
 	lea		$dff250,a0
@@ -25,15 +22,15 @@
 	fmove.l	e0,d3					;xStart = (int)xLeft;
 	fmove.l	e1,d4					;xEnd = (int)xRight;
 
-  	cmp.l	(a5),d3					;if(scissorLeft > x0)
-  	bge		.noClipX0
+	cmp.l	(a4),d3					;if(scissorLeft > x0)
+	bge		.noClipX0
 
-  	move.l	(a5),d3					;xStart = scissorLeft
+	move.l	(a4),d3					;xStart = scissorLeft
 .noClipX0:
-	cmp.l	Scsr_x1(a5),d4 					;if(scissorRight < x1)
+	cmp.l	Scsr_x1(a4),d4 					;if(scissorRight < x1)
 	ble		.noClipX1
 
-	move.l	Scsr_x1(a5),d4					;xEnd = scissorRight
+	move.l	Scsr_x1(a4),d4					;xEnd = scissorRight
 .noClipX1:
 	sub.l	d3,d4					;len = x1 - x0
 	ble		.noPixels
@@ -43,13 +40,11 @@
 
 	lea		(a3,d3.l*.bpp),a1			;dstColPtr = pixels + xStart
 	move.l	a1,Maggie_pixDest(a0)
-	lea		(a4,d3.l*2),a1			;dstColPtr = zbuffer + xStart
-	move.l	a1,Maggie_depthDest(a0)
 
 	fmove.s	EPos_iLeft(a2),e12		; iowLeft
 	fmove.s	EPos_iRight(a2),e13		; iowRight
-	fsub	e0,e2,e2				;preStep = 1 + xStart - edges[i].xPosLeft
-	fdiv	e3,e4,e3	; ooXLength = 1.0f / xDiff
+	fsub	e0,e2,e2				; preStep = 1 + xStart - edges[i].xPosLeft
+	fdiv	e3,e4,e3				; ooXLength = 1.0f / xDiff
 	fmove.s	EPos_oowLeft(a2),e14	; oowLeft
 	fmove.s	EPos_oowRight(a2),e15	; oowRight
 	fmove.s	EPos_uowLeft(a2),e17	; uowLeft
@@ -149,12 +144,11 @@
 	move.w	d4,Maggie_startLength(a0)
 .noPixels:
 	lea		(a3,d2.l*.bpp),a3			;pixels += modulo
-	lea		(a4,d2.l*2),a4			;pixels += modulo
 	lea		EPos_Size(a2),a2
 
 	subq.l	#1,d7 ; ylen
 	bne		.vLoop
 
-	movem.l	(a7)+,d2-d7/a2-a6
-.allDone:
+	movem.l	(a7)+,d2-d7/a2-a4
+.noVlinesToDo:
 	rts

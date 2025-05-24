@@ -373,7 +373,7 @@ oldDmacon:		dc.w	0
 	align 2
 
 MaggieBase:		dc.l	0
-MaggieName:		dc.b	"libs/maggie.library",0
+MaggieName:		dc.b	"maggie.library",0
 
 	align 2
 

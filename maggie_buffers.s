@@ -128,7 +128,7 @@ _DrawLineAsm:
 	fadd    e10,e16
 	fadd    e11,e17
 .loop:
-	fmove.s	e12,EPos_xPosLeft(a0)
+	fmove.s	e12,(a0) ;EPos_xPosLeft
 	fadd	e0,e12
 	fmove.s	e13,EPos_zLeft(a0)
 	fadd	e1,e13
@@ -186,7 +186,7 @@ _DrawLineAffineAsm:
 	fadd    e10,e16
 	fadd    e11,e17
 .loop:
-	fmove.s	e12,EAffPos_xPosLeft(a0)
+	fmove.s	e12,(a0) ;EAffPos_xPosLeft
 	fadd	e0,e12
 	fmove.s	e13,EAffPos_zLeft(a0)
 	fadd	e1,e13
