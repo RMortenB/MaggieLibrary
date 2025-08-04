@@ -183,7 +183,7 @@ void CompressRGB(UBYTE *dst, UBYTE *src, int width, int height, int pixelSize, i
 			block->col1 = RGBTo16Bit((rMin << 16) | (gMin << 8) | bMin);
 			block->pixels = 0;
 			int blk4 = 1;
-			if(lenSq > 0.0f)
+			if(block->col0 != block->col1)
 			{
 				float lowestError;
 				float ooLenSq = 1.0f / lenSq;
