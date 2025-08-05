@@ -29,6 +29,10 @@ static void SetupHW(MaggieBase *lib)
 	{
 		drawMode |= 0x0080;
 	}
+	if(mode & MAG_DRAWMODE_DEPTH_MASK)
+	{
+		drawMode |= 0x0008;
+	}
 	UWORD modulo = 4;
 	if(!(mode & MAG_DRAWMODE_32BIT))
 	{
