@@ -454,6 +454,12 @@ void FlushImmediateMode(MaggieBase *lib)
 	{
 		UWORD oldVBuffer = lib->vBuffer;
 		lib->vBuffer = lib->immModeVtx;
+		VertexBufferMemory *vbMem = lib->vertexBuffers[lib->vBuffer];
+
+		for(int i = 0; i < lib->nIModeVtx; ++i)
+		{
+			vbMem->transVerts[i].colour = (vbMem->colours[i] << 8) | vbMem->colours[i];
+		}
 
 		magDrawTriangles(0, lib->nIModeVtx, lib);
 
