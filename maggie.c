@@ -151,9 +151,11 @@ static APTR functionTable[] =
 static const char libName[] = "maggie.library";
 static const char libId[] = "maggie 1.30 (" __DATE__ ")";
 static const char libVersion[] = "\0$VER: maggie 1.30 (" __DATE__ ")";
-
+void setRoundingModeRZ();
 static APTR maggieInit(int segList __asm("a0"), MaggieBase *lib __asm("d0"), struct ExecBase *sysBase __asm("a6"))
 {
+	setRoundingModeRZ();
+
 	lib->lib.lib_Node.ln_Type = NT_LIBRARY;
 	lib->lib.lib_Node.ln_Name = (char *)libName;
 	lib->lib.lib_Flags = LIBF_CHANGED | LIBF_SUMUSED;

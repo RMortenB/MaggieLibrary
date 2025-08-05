@@ -457,12 +457,15 @@ void magFreeIndexBuffer(REG(d0, UWORD iBuffer), REG(a6, MaggieBase *lib))
 }
 
 /*****************************************************************************/
-
+void setRoundingModeRZ();
 // Library Lock..
 void magBeginScene(REG(a6, MaggieBase *lib))
 {
 	struct ExecBase *SysBase = lib->sysBase;
 	ObtainSemaphore(&lib->lock);
+
+	setRoundingModeRZ();
+
 	for(int i = 0; i < MAG_MAX_LIGHTS; ++i)
 	{
 		lib->lights[i].type = MAG_LIGHT_OFF;

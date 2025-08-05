@@ -205,3 +205,13 @@ _DrawLineAffineAsm:
     rts
 
 	public _DrawLineAffineAsm
+
+
+_setRoundingModeRZ:
+	fmove.l	fpcr,d0
+	and.l	#$ffffffcf,d0
+	or.l	#$00000010,d0
+	fmove.l	d0,fpcr
+	rts
+
+	public _setRoundingModeRZ
