@@ -24,7 +24,7 @@ SOURCES=maggie.c \
 
 ASFLAGS=-m68080 -m68882 -quiet -Fhunk -I /opt/amiga/m68k-amigaos/ndk-include
 
-CFLAGS=-std=c11 -noixemul -Ofast -fomit-frame-pointer -m68080 -mregparm -mhard-float -I include -Wdouble-promotion
+CFLAGS=-std=c11 -noixemul -Ofast -fno-unsafe-math-optimizations -fomit-frame-pointer -m68080 -mregparm -mhard-float -I include -Wdouble-promotion
 
 LFLAGS=-nostartfiles
 LDLIBS=
