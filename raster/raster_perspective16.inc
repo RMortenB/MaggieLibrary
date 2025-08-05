@@ -43,6 +43,7 @@
 
 	fmove.s	EPos_iLeft(a2),e12		; iowLeft
 	fmove.s	EPos_iRight(a2),e13		; iowRight
+
 	fsub	e0,e2,e2				; preStep = 1 + xStart - edges[i].xPosLeft
 	fdiv	e3,e4,e3				; ooXLength = 1.0f / xDiff
 	fmove.s	EPos_oowLeft(a2),e14	; oowLeft
@@ -73,9 +74,11 @@
 
 	moveq	#16,d6
 
-	fmove.l	e12,d1
+	fmoverz.l	e12,d1
+	fmoverz.l	e13,d3
+
 	move.w	d1,Maggie_light(a0)
-	fmove.w	e13,Maggie_lightDelta(a0) ; The Depth delta is essentially constant for the whole polygon
+	move.w	d3,Maggie_lightDelta(a0)
 
 	fmove.l	e5,Maggie_uCoord(a0)
 	fmove.l	e6,Maggie_vCoord(a0)

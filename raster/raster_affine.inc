@@ -35,7 +35,9 @@
 	GetScreenPtr a3
 	GetScissorPtr a4
 
-	fmove.w	e13,Maggie_lightDelta(a0)
+	fmoverz.l	e13,d3
+
+	move.w	d3,Maggie_lightDelta(a0)
 	fmove.l	e18,Maggie_uDelta(a0)	; uDDA = uDiff * ooXLength
 	fmove.l	e21,Maggie_vDelta(a0)	; vDDA = vDiff * ooXLength
 

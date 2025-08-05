@@ -38,8 +38,10 @@
 	GetDepthPtr a4
 	GetScissorPtr a5
 
+	fmoverz.l	e13,d3
+
 	fmove.l	e11,Maggie_depthDelta(a0)
-	fmove.w	e13,Maggie_lightDelta(a0)
+	move.w	d3,Maggie_lightDelta(a0)
 	fmove.l	e18,Maggie_uDelta(a0)			; uDDA = uDiff * ooXLength
 	fmove.l	e21,Maggie_vDelta(a0)			; vDDA = vDiff * ooXLength
 

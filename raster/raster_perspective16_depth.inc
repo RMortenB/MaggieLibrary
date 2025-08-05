@@ -88,11 +88,16 @@
 	moveq	#16,d6
 
 	fsub.s	#$4f000000,e10
-	fmove.l	e12,d1
+
+	fmoverz.l	e12,d1
+	fmoverz.l	e13,d3
+
 	fmove.l e10,d0
 	add.l	#-2147483648,d0
+
 	move.w	d1,Maggie_light(a0)
-	fmove.w	e13,Maggie_lightDelta(a0) ; The Depth delta is essentially constant for the whole polygon
+	move.w	d3,Maggie_lightDelta(a0)
+
 	move.l	d0,Maggie_depthStart(a0)
 	fmove.l	e11,Maggie_depthDelta(a0)
 
