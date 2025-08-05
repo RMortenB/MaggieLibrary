@@ -84,6 +84,22 @@ static void DecompNormal(vec3 *dest, MaggieNormal *n)
 
 /*****************************************************************************/
 
+static float my_cosf(float x)
+{
+	float c;
+
+	__asm(
+		"fmove.s %0, fp0\n\t"
+		"fcos.x fp0\n\t"
+		"fmove.s fp0,%1\n\t"
+		: "=r"(c)
+		: "r"(x)
+		: "fp0", "cc"
+	);
+	return c;
+}
+
+
 void LightBuffer(VertexBufferMemory *src, int startIndex, int nVerts, MaggieBase *lib)
 {
 	struct MaggieTransVertex *dest = src->transVerts;
@@ -145,9 +161,8 @@ void LightBuffer(VertexBufferMemory *src, int startIndex, int nVerts, MaggieBase
 				vec3_tform(&iLightPos, &iWorld, &lib->lights[i].pos, 1.0f);
 				vec3_tform(&iLightDir, &iWorld, &lib->lights[i].dir, 0.0f);
 
-				float cosPhi = cosf(lib->lights[i].phi);
-				float cosTheta = cosf((lib->lights[i].phi) / 2.0f);
-				float ooPmT = 1.0f / (cosTheta - cosPhi);
+				float cosPhi = my_cosf(lib->lights[i].phi);
+				float cosTheta = my_cosf((lib->lights[i].phi / 2.0f));
 				vec3 lDir;
 				float lightColour = lib->lights[i].colour;
 				for(int j = 0; j < nVerts; ++j)
@@ -163,7 +178,7 @@ void LightBuffer(VertexBufferMemory *src, int startIndex, int nVerts, MaggieBase
 						{
 							if(cosAngle < cosTheta)
 							{
-								lambert *= (cosAngle - cosPhi) * ooPmT;
+								lambert *= (cosAngle - cosPhi) / (cosTheta - cosPhi);
 							}
 							float attenuation = lib->lights[i].attenuation / (dist * dist);
 							dest[j].colour += (int)(src->colours[startIndex + j] * lambert * attenuation * lightColour) >> 8;
@@ -175,7 +190,7 @@ void LightBuffer(VertexBufferMemory *src, int startIndex, int nVerts, MaggieBase
 			{
 				for(int j = 0; j < nVerts; ++j)
 				{
-					dest[j].colour += lib->lights[i].colour;
+					dest[j].colour += lib->lights[i].colour | (lib->lights[i].colour << 8);
 				}
 			} break;
 		}
