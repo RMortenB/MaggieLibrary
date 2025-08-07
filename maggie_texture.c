@@ -136,7 +136,7 @@ UWORD magAllocateTexture(REG(d0, UWORD size), REG(a6, MaggieBase *lib))
 	else
 	 	format = MAG_TEXFMT_RGBA;
 
-	int txtrMemSize = GetTextureSize(format, size) + sizeof(magTexture);
+	int txtrMemSize = GetTextureSize(format, size) + sizeof(magTexture) + 32;
 	UBYTE *mem = (UBYTE *)AllocMem(txtrMemSize, MEMF_ANY | MEMF_CLEAR);
 
 	if(!mem)
@@ -145,7 +145,7 @@ UWORD magAllocateTexture(REG(d0, UWORD size), REG(a6, MaggieBase *lib))
 		return 0xffff;
 	}
 
-	magTexture *texture = (magTexture *)mem;
+	magTexture *texture = (magTexture *)(((ULONG)mem) + 31 & ~31);
 	texture->texSize = size;
 	texture->mipMaps = 0;
 	texture->allocPtr = mem;

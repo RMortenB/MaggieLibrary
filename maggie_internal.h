@@ -142,6 +142,7 @@ typedef struct
 	UWORD mipMaps;
 	UWORD format;
 	UBYTE *allocPtr;
+	UBYTE alignmentPadding[32 - (sizeof(ULONG) * 3 + sizeof(UWORD) * 2)];
 	UBYTE data[];
 } magTexture;
 
