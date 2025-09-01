@@ -16,7 +16,7 @@ static void DecompNormal(vec3 *dest, MaggieNormal *n)
 
 /*****************************************************************************/
 
-void TexGenBuffer(VertexBufferMemory *src, int startIndex, int nVerts, MaggieBase *lib)
+void TexGenBuffer(VertexBufferMemory *src, int startVtx, int nVerts, MaggieBase *lib)
 {
 	struct MaggieTransVertex *dstVtx = src->transVerts;
 #if PROFILE
@@ -32,9 +32,9 @@ void TexGenBuffer(VertexBufferMemory *src, int startIndex, int nVerts, MaggieBas
 			{
 				for(UWORD j = 0; j < MAGGIE_MAX_TEXCOORDS; ++j)
 				{
-					dstVtx[i].tex[j].u = src->uvs[i].u;
-					dstVtx[i].tex[j].v = src->uvs[i].v;
-					dstVtx[i].tex[j].w = src->uvs[i].w;
+					dstVtx[i + startVtx].tex[j].u = src->uvs[i + startVtx].u;
+					dstVtx[i + startVtx].tex[j].v = src->uvs[i + startVtx].v;
+					dstVtx[i + startVtx].tex[j].w = src->uvs[i + startVtx].w;
 				}
 			}
 		} break;
@@ -44,9 +44,9 @@ void TexGenBuffer(VertexBufferMemory *src, int startIndex, int nVerts, MaggieBas
 			{
 				for(UWORD j = 0; j < MAGGIE_MAX_TEXCOORDS; ++j)
 				{
-					dstVtx[i].tex[j].u = src->positions[i].x * 256.0f * 65536.0f;
-					dstVtx[i].tex[j].v = src->positions[i].y * 256.0f * 65536.0f;
-					dstVtx[i].tex[j].w = 1.0f;
+					dstVtx[i + startVtx].tex[j].u = src->positions[i + startVtx].x * 256.0f * 65536.0f;
+					dstVtx[i + startVtx].tex[j].v = src->positions[i + startVtx].y * 256.0f * 65536.0f;
+					dstVtx[i + startVtx].tex[j].w = 1.0f;
 				}
 			}
 		} break;
@@ -55,13 +55,13 @@ void TexGenBuffer(VertexBufferMemory *src, int startIndex, int nVerts, MaggieBas
 			for(UWORD i = 0; i < nVerts; ++i)
 			{
 				vec3 viewNormal, normal;
-				DecompNormal(&normal, &src->normals[i]);
+				DecompNormal(&normal, &src->normals[i + startVtx]);
 				vec3_tform(&viewNormal, &lib->modelView, &normal, 0.0f);
 				for(UWORD j = 0; j < MAGGIE_MAX_TEXCOORDS; ++j)
 				{
-					dstVtx[i].tex[j].u = (viewNormal.x * 0.5f + 0.5f) * 256.0f * 65536.0f;
-					dstVtx[i].tex[j].v = (viewNormal.y * 0.5f + 0.5f) * 256.0f * 65536.0f;
-					dstVtx[i].tex[j].w = 1.0f;
+					dstVtx[i + startVtx].tex[j].u = (viewNormal.x * 0.5f + 0.5f) * 256.0f * 65536.0f;
+					dstVtx[i + startVtx].tex[j].v = (viewNormal.y * 0.5f + 0.5f) * 256.0f * 65536.0f;
+					dstVtx[i + startVtx].tex[j].w = 1.0f;
 				}
 			}
 		} break;
@@ -74,9 +74,9 @@ void TexGenBuffer(VertexBufferMemory *src, int startIndex, int nVerts, MaggieBas
 				vec3 viewReflected;
 				vec3 normScale;
 				vec3 normal;
-				DecompNormal(&normal, &src->normals[i]);
+				DecompNormal(&normal, &src->normals[i + startVtx]);
 				vec3_tform(&viewNormal, &lib->modelView, &normal, 0.0f);
-				vec3_tform(&viewPos, &lib->modelView, &src->positions[i], 1.0f);
+				vec3_tform(&viewPos, &lib->modelView, &src->positions[i + startVtx], 1.0f);
 
 				float VdotN = vec3_dot(&viewPos, &viewNormal);
 				vec3_scale(&normScale, &viewNormal, VdotN * 2.0f);
@@ -86,9 +86,9 @@ void TexGenBuffer(VertexBufferMemory *src, int startIndex, int nVerts, MaggieBas
 
 				for(UWORD j = 0; j < MAGGIE_MAX_TEXCOORDS; ++j)
 				{
-					dstVtx[i].tex[j].u = (viewReflected.x * 0.5f + 0.5f) * 256.0f * 65536.0f;
-					dstVtx[i].tex[j].v = (viewReflected.y * 0.5f + 0.5f) * 256.0f * 65536.0f;
-					dstVtx[i].tex[j].w = 1.0f;
+					dstVtx[i + startVtx].tex[j].u = (viewReflected.x * 0.5f + 0.5f) * 256.0f * 65536.0f;
+					dstVtx[i + startVtx].tex[j].v = (viewReflected.y * 0.5f + 0.5f) * 256.0f * 65536.0f;
+					dstVtx[i + startVtx].tex[j].w = 1.0f;
 				}
 			}
 		} break;

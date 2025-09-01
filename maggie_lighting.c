@@ -99,8 +99,7 @@ static float my_cosf(float x)
 	return c;
 }
 
-
-void LightBuffer(VertexBufferMemory *src, int startIndex, int nVerts, MaggieBase *lib)
+void LightBuffer(VertexBufferMemory *src, int startVtx, int nVerts, MaggieBase *lib)
 {
 	struct MaggieTransVertex *dest = src->transVerts;
 #if PROFILE
@@ -108,7 +107,7 @@ void LightBuffer(VertexBufferMemory *src, int startIndex, int nVerts, MaggieBase
 #endif
 	for(int i = 0; i < nVerts; ++i)
 	{
-		dest[i].colour = 0;
+		dest[i + startVtx].colour = 0;
 	}
 	mat4 iWorld;
 	mat4_inverseLight(&iWorld, &lib->worldMatrix);
@@ -128,14 +127,14 @@ void LightBuffer(VertexBufferMemory *src, int startIndex, int nVerts, MaggieBase
 				float lightColour = lib->lights[i].colour;
 				for(int j = 0; j < nVerts; ++j)
 				{
-					vec3_sub(&lDir, &iLightPos, &src->positions[startIndex + j]);
+					vec3_sub(&lDir, &iLightPos, &src->positions[startVtx + j]);
 					float dist = vec3_normalise(&lDir, &lDir);
-					DecompNormal(&normal, &src->normals[startIndex + j]);
+					DecompNormal(&normal, &src->normals[startVtx + j]);
 					float lambert = vec3_dot(&lDir, &normal);
 					if(lambert > 0.0f)
 					{
 						float attenuation = lib->lights[i].attenuation / (dist * dist);
-						dest[j].colour += (int)(src->colours[startIndex + j] * lambert * attenuation * lightColour) >> 8;
+						dest[j + startVtx].colour += (int)(src->colours[startVtx + j] * lambert * attenuation * lightColour) >> 8;
 					}
 				}
 			} break;
@@ -147,10 +146,10 @@ void LightBuffer(VertexBufferMemory *src, int startIndex, int nVerts, MaggieBase
 				vec3_tform(&lDir, &iWorld, &lib->lights[i].dir, 0.0f);
 				for(int j = 0; j < nVerts; ++j)
 				{
-					DecompNormal(&normal, &src->normals[startIndex + j]);
+					DecompNormal(&normal, &src->normals[startVtx + j]);
 					float lambert = -vec3_dot(&lDir, &normal);
 					if(lambert > 0.0f)
-						dest[j].colour += (int)(src->colours[startIndex + j] * lambert * lightColour) >> 8;
+						dest[j + startVtx].colour += (int)(src->colours[startVtx + j] * lambert * lightColour) >> 8;
 				}
 			} break;
 			case MAG_LIGHT_SPOT :
@@ -165,11 +164,12 @@ void LightBuffer(VertexBufferMemory *src, int startIndex, int nVerts, MaggieBase
 				float cosTheta = my_cosf((lib->lights[i].phi / 2.0f));
 				vec3 lDir;
 				float lightColour = lib->lights[i].colour;
+				float attenuation = lib->lights[i].attenuation;
 				for(int j = 0; j < nVerts; ++j)
 				{
-					vec3_sub(&lDir, &iLightPos, &src->positions[startIndex + j]);
+					vec3_sub(&lDir, &iLightPos, &src->positions[startVtx + j]);
 					float dist = vec3_normalise(&lDir, &lDir);
-					DecompNormal(&normal, &src->normals[startIndex + j]);
+					DecompNormal(&normal, &src->normals[startVtx + j]);
 					float lambert = vec3_dot(&lDir, &normal);
 					float cosAngle = vec3_dot(&iLightDir, &lDir);
 					if(lambert > 0.0f)
@@ -180,25 +180,26 @@ void LightBuffer(VertexBufferMemory *src, int startIndex, int nVerts, MaggieBase
 							{
 								lambert *= (cosAngle - cosPhi) / (cosTheta - cosPhi);
 							}
-							float attenuation = lib->lights[i].attenuation / (dist * dist);
-							dest[j].colour += (int)(src->colours[startIndex + j] * lambert * attenuation * lightColour) >> 8;
+							float att = attenuation / (dist * dist);
+							dest[j + startVtx].colour += (int)(src->colours[startVtx + j] * lambert * att * lightColour) >> 8;
 						}
 					}
 				}
 			} break;
 			case MAG_LIGHT_AMBIENT :
 			{
+				int lightColour = lib->lights[i].colour | (lib->lights[i].colour << 8);
 				for(int j = 0; j < nVerts; ++j)
 				{
-					dest[j].colour += lib->lights[i].colour | (lib->lights[i].colour << 8);
+					dest[j + startVtx].colour += lightColour;
 				}
 			} break;
 		}
 	}
 	for(int i = 0; i < nVerts; ++i)
 	{
-		if(dest[i].colour > 0xffff)
-			dest[i].colour = 0xffff;
+		if(dest[i + startVtx].colour > 0xffff)
+			dest[i + startVtx].colour = 0xffff;
 	}
 #if PROFILE
 	lib->profile.light += GetClocks() - lightStart;

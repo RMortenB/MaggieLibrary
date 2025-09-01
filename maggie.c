@@ -149,8 +149,8 @@ static APTR functionTable[] =
 };
 
 static const char libName[] = "maggie.library";
-static const char libId[] = "maggie 1.30 (" __DATE__ ")";
-static const char libVersion[] = "\0$VER: maggie 1.30 (" __DATE__ ")";
+static const char libId[] = "maggie 4.0 (" __DATE__ ")";
+static const char libVersion[] = "\0$VER: maggie 4.0 (" __DATE__ ")";
 void setRoundingModeRZ();
 static APTR maggieInit(int segList __asm("a0"), MaggieBase *lib __asm("d0"), struct ExecBase *sysBase __asm("a6"))
 {
@@ -159,8 +159,8 @@ static APTR maggieInit(int segList __asm("a0"), MaggieBase *lib __asm("d0"), str
 	lib->lib.lib_Node.ln_Type = NT_LIBRARY;
 	lib->lib.lib_Node.ln_Name = (char *)libName;
 	lib->lib.lib_Flags = LIBF_CHANGED | LIBF_SUMUSED;
-	lib->lib.lib_Version = 3;
-	lib->lib.lib_Revision = 3;
+	lib->lib.lib_Version = 4;
+	lib->lib.lib_Revision = 0;
 	lib->lib.lib_IdString = (char *)libId;
 
 	lib->segList = segList;
@@ -230,7 +230,7 @@ const struct Resident romTag =
 	(APTR)&romTag,
 	(APTR)&romTag + 1,
 	RTF_AUTOINIT,
-	3,
+	4,
 	NT_LIBRARY,
 	0,
 	(APTR)libName,

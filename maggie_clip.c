@@ -1,3 +1,4 @@
+
 #include <exec/types.h>
 #include "maggie_vertex.h"
 #include "maggie_internal.h"
@@ -22,11 +23,26 @@ static void LerpTransVertex(struct MaggieTransVertex *res, const struct MaggieTr
 
 /*****************************************************************************/
 
+static UBYTE ClipCode(const vec4 *v)
+{
+	UBYTE code = 0;
+
+	if(-v->w >= v->x) code |= 0x01;
+	if( v->w <= v->x) code |= 0x02;
+	if(-v->w >= v->y) code |= 0x04;
+	if( v->w <= v->y) code |= 0x08;
+	if( 0.0f >= v->z) code |= 0x10;
+	if( v->w <= v->z) code |= 0x20;
+
+	return code;
+}
+
+/*****************************************************************************/
+
 int ClipPolygon(struct MaggieTransVertex *verts, int nVerts)
 {
 	static struct MaggieTransVertex tmpPoly0[MAG_MAX_POLYSIZE + 6];
 	static struct MaggieTransVertex tmpPoly1[MAG_MAX_POLYSIZE + 6];
-
 	const struct MaggieTransVertex *inBuffer = verts;
 	struct MaggieTransVertex *outBuffer = tmpPoly1;
 	int prevVertex = nVerts - 1;
