@@ -442,13 +442,14 @@ static int mat4_inverse(mat4 *res, const mat4 *mat)
 {
 	mat4 a = *mat;
 	mat4 b;
+	int i, j;
 	mat4_identity(&b);
 
-	for(int j = 0; j < 4; ++j)
+	for(j = 0; j < 4; ++j)
 	{
 		int i1 = j;
 
-		for(int i = j + 1; i < 4; ++i)
+		for(i = j + 1; i < 4; ++i)
 			if (fabsf(a.m[i][j]) > fabsf(a.m[i1][j]))
 				i1 = i;
 
@@ -467,13 +468,13 @@ static int mat4_inverse(mat4 *res, const mat4 *mat)
 
 		float ooDiv = 1.0f / a.m[j][j];
 
-		for(int i = 0; i < 4; ++i)
+		for(i = 0; i < 4; ++i)
 		{
 			b.m[j][i] *= ooDiv;
 			a.m[j][i] *= ooDiv;
 		}
 
-		for (int i = 0; i < 4; ++i)
+		for(i = 0; i < 4; ++i)
 		{
 			if (i != j)
 			{
