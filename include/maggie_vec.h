@@ -442,7 +442,7 @@ static int mat4_inverse(mat4 *res, const mat4 *mat)
 {
 	mat4 a = *mat;
 	mat4 b;
-	int i, j;
+	int i, j, k;
 	mat4_identity(&b);
 
 	for(j = 0; j < 4; ++j)
@@ -481,13 +481,13 @@ static int mat4_inverse(mat4 *res, const mat4 *mat)
 				float veca[4];
 				float vecb[4];
 
-				for(int k = 0; k < 4; ++k)
+				for(k = 0; k < 4; ++k)
 				{
 					veca[k] = a.m[i][j] * a.m[j][k];
 					vecb[k] = a.m[i][j] * b.m[j][k];
 				}
 
-				for(int k = 0; k < 4; ++k)
+				for(k = 0; k < 4; ++k)
 				{
 					a.m[i][k] -= veca[k];
 					b.m[i][k] -= vecb[k];
