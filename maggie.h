@@ -8,8 +8,8 @@ struct MaggieClippedVertex;
 struct MaggieSpriteVertex;
 struct SpanPosition;
 
-struct vec3
-typedef struct vec3 vec3;
+struct vec3;
+struct vec2;
 
 void __magDummy(); // Duff prototype.. Not a function.
 
