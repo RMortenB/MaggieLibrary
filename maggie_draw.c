@@ -97,7 +97,7 @@ static UBYTE ClipCode(const vec4 *v)
 
 /*****************************************************************************/
 
-int ComputeClipCodes(UBYTE *clipCodes, struct MaggieTransVertex *vtx, UWORD nVerts)
+static int ComputeClipCodes(UBYTE *clipCodes, struct MaggieTransVertex *vtx, UWORD nVerts)
 {
 	UBYTE out = ~0;
 	UBYTE in = 0;
@@ -116,7 +116,7 @@ int ComputeClipCodes(UBYTE *clipCodes, struct MaggieTransVertex *vtx, UWORD nVer
 
 /*****************************************************************************/
 
-void NormaliseVertexBuffer(struct MaggieTransVertex *vtx, int nVerts, UBYTE *clipCodes, MaggieBase *lib)
+static void NormaliseVertexBuffer(struct MaggieTransVertex *vtx, int nVerts, UBYTE *clipCodes, MaggieBase *lib)
 {
 	float offsetScaleX = (lib->xres + 0.5f) * 0.5f;
 	float offsetScaleY = (lib->yres + 0.5f) * 0.5f;
@@ -160,7 +160,7 @@ void NormaliseVertexBuffer(struct MaggieTransVertex *vtx, int nVerts, UBYTE *cli
 
 /*****************************************************************************/
 
-void NormaliseClippedVertexBuffer(struct MaggieTransVertex *vtx, int nVerts, MaggieBase *lib)
+static void NormaliseClippedVertexBuffer(struct MaggieTransVertex *vtx, int nVerts, MaggieBase *lib)
 {
 	float offsetScaleX = (lib->xres + 0.5f) * 0.5f;
 	float offsetScaleY = (lib->yres + 0.5f) * 0.5f;
@@ -207,7 +207,7 @@ int my_abs(int v)
 
 /*****************************************************************************/
 
-void DrawScreenLine(MaggieBase *lib, int x0, int y0, int x1, int y1)
+static void DrawScreenLine(MaggieBase *lib, int x0, int y0, int x1, int y1)
 {
 	int dx = my_abs(x1 - x0);
 	int dy = my_abs(y1 - y0);
@@ -240,7 +240,7 @@ void DrawScreenLine(MaggieBase *lib, int x0, int y0, int x1, int y1)
 
 /*****************************************************************************/
 
-void DrawTriangle(struct MaggieTransVertex *vtx0, struct MaggieTransVertex *vtx1, struct MaggieTransVertex *vtx2, MaggieBase *lib)
+static void DrawTriangle(struct MaggieTransVertex *vtx0, struct MaggieTransVertex *vtx1, struct MaggieTransVertex *vtx2, MaggieBase *lib)
 {
 	float area = TriangleArea(&vtx0->pos, &vtx1->pos, &vtx2->pos);
 
@@ -277,7 +277,7 @@ void DrawTriangle(struct MaggieTransVertex *vtx0, struct MaggieTransVertex *vtx1
 
 /*****************************************************************************/
 
-void DrawPolygon(struct MaggieTransVertex *vtx, int nVerts, MaggieBase *lib)
+static void DrawPolygon(struct MaggieTransVertex *vtx, int nVerts, MaggieBase *lib)
 {
 	if(nVerts < 3)
 		return;
@@ -325,7 +325,7 @@ void DrawPolygon(struct MaggieTransVertex *vtx, int nVerts, MaggieBase *lib)
 
 /*****************************************************************************/
 
-void DrawIndexedPolygon(struct MaggieTransVertex *vtx, UWORD *indx, int nIndx, MaggieBase *lib)
+static void DrawIndexedPolygon(struct MaggieTransVertex *vtx, UWORD *indx, int nIndx, MaggieBase *lib)
 {
 	if(nIndx < 3)
 		return;
@@ -536,7 +536,7 @@ static struct MaggieTransVertex pass1vtx[1024];
 
 /*****************************************************************************/
 
-void DrawSpan(float leftPos, float rightPos, float leftWW, float leftUU, float leftVV, float leftZZ, float leftII, const magGradients *gradients, MaggieBase *lib)
+static void DrawSpan(float leftPos, float rightPos, float leftWW, float leftUU, float leftVV, float leftZZ, float leftII, const magGradients *gradients, MaggieBase *lib)
 {
 
 }
@@ -773,7 +773,7 @@ void magDrawSpan(REG(a0, struct MaggieClippedVertex *start), REG(a1, struct Magg
 
 /*****************************************************************************/
 
-void ExpandSpriteBuffer(struct MaggieTransVertex *dest, struct MaggieSpriteVertex *srcVtx, int nSprites, float spriteSize, MaggieBase *lib)
+static void ExpandSpriteBuffer(struct MaggieTransVertex *dest, struct MaggieSpriteVertex *srcVtx, int nSprites, float spriteSize, MaggieBase *lib)
 {
 	for(int i = 0; i < nSprites; ++i)
 	{
