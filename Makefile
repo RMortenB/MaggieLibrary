@@ -3,6 +3,9 @@ TARGET=maggie.library
 AS=vasmm68k_mot
 CXX=m68k-amigaos-g++
 CC=m68k-amigaos-gcc
+AR=m68k-amigaos-ar
+
+STATIC_TARGET=libmaggie.a
 
 SOURCES=maggie.c \
 		maggie_funcs.c \
@@ -32,10 +35,22 @@ LDLIBS=
 OBJSC=$(SOURCES:.c=.o)
 OBJS=$(OBJSC:.s=.o)
 
-all: $(SOURCES) $(TARGET) Makefile
+# Static-library variant: the same objects as the resident build, minus the
+# resident entry glue in maggie.c (romTag/functionTable/maggieInit/Open/Close/
+# Expunge), plus the plain-C context lifecycle in maggie_static.c. Built with
+# the identical CFLAGS so the -mregparm/-mhard-float ABI matches the callers.
+STATIC_OBJS=$(filter-out maggie.o,$(OBJS)) maggie_static.o
+
+all: $(SOURCES) $(TARGET) $(STATIC_TARGET) Makefile
 
 $(TARGET): $(OBJS) Makefile
 	$(CC) $(LFLAGS) $(OBJS) $(LDLIBS) -o $(TARGET)
+
+$(STATIC_TARGET): $(STATIC_OBJS) Makefile
+	rm -f $(STATIC_TARGET)
+	$(AR) rcs $(STATIC_TARGET) $(STATIC_OBJS)
+
+static: $(STATIC_TARGET)
 
 purge: clean
 	rm -f $(TARGET)
@@ -44,4 +59,4 @@ strip:
 	m68k-amigaos-strip $(TARGET)
 
 clean:
-	rm -f $(OBJS) $(TARGET)
+	rm -f $(OBJS) maggie_static.o $(TARGET) $(STATIC_TARGET)
