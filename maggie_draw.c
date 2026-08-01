@@ -7,6 +7,10 @@
 void DrawPolygon1Pass(const magGradients *gradients, struct MaggieTransVertex *vtx, int nVerts, MaggieBase *lib);
 float getBestDistance3(magGradients *res, const struct MaggieTransVertex *vtx);
 float getBestDistance(magGradients *res, const struct MaggieTransVertex *vtx, int nVerts);
+
+// The perspective+depth rasterizer reads lib->gradients at a hardcoded offset
+// (GetGradientsPtr in raster_structs.i). Keep the two in lockstep.
+_Static_assert(__builtin_offsetof(MaggieBase, gradients) == 52312, "gradients offset changed - update GetGradientsPtr in raster_structs.i");
 /*****************************************************************************/
 
 static void SetupHW(MaggieBase *lib)
@@ -78,6 +82,81 @@ static float TriangleArea(vec4 *p0, vec4 *p1, vec4 *p2)
 
 	return x0 * y1 - x1 * y0;
 }
+
+/*****************************************************************************/
+
+// Per-polygon horizontal (d/dx) attribute gradients via fan-sum.
+// oow=1/w, uow=u/w, vow=v/w, z and i are all affine in screen space, so each
+// gradient is a single polygon constant: A_f = sum(num_i) / sum(denom_i) over
+// the fan (v0, v_i, v_j), where sum(denom_i) == 2*signed area. Conditioning
+// follows the total polygon area, not any one scanline's width, which is why
+// this replaces the per-scanline (right-left)/dx the rasterizer does today.
+// The attribute->field mapping matches what DrawLine interpolates into magEdge.
+
+static void ComputeGradients3(magGradients *g,
+	const struct MaggieTransVertex *v0,
+	const struct MaggieTransVertex *v1,
+	const struct MaggieTransVertex *v2)
+{
+	float x1 = v1->pos.x - v0->pos.x;
+	float y1 = v1->pos.y - v0->pos.y;
+	float x2 = v2->pos.x - v0->pos.x;
+	float y2 = v2->pos.y - v0->pos.y;
+
+	float denom = x1 * y2 - x2 * y1;
+	if((denom > -1e-6f) && (denom < 1e-6f))
+	{
+		g->oowDDA = g->uowDDA = g->vowDDA = g->zDDA = g->iDDA = 0.0f;
+		return;
+	}
+	float ooDenom = 1.0f / denom;
+
+	g->oowDDA = ((v1->pos.w    - v0->pos.w)    * y2 - (v2->pos.w    - v0->pos.w)    * y1) * ooDenom;
+	g->uowDDA = ((v1->tex[0].u - v0->tex[0].u) * y2 - (v2->tex[0].u - v0->tex[0].u) * y1) * ooDenom;
+	g->vowDDA = ((v1->tex[0].v - v0->tex[0].v) * y2 - (v2->tex[0].v - v0->tex[0].v) * y1) * ooDenom;
+	g->zDDA   = ((v1->pos.z    - v0->pos.z)    * y2 - (v2->pos.z    - v0->pos.z)    * y1) * ooDenom;
+	g->iDDA   = (((float)v1->colour - (float)v0->colour) * y2 - ((float)v2->colour - (float)v0->colour) * y1) * ooDenom;
+}
+
+/*****************************************************************************/
+
+static void ComputeGradients(magGradients *g, const struct MaggieTransVertex *vtx, const UWORD *indx, int n)
+{
+	const struct MaggieTransVertex *v0 = indx ? &vtx[indx[0]] : &vtx[0];
+
+	float denom = 0.0f;
+	float nOow = 0.0f, nUow = 0.0f, nVow = 0.0f, nZ = 0.0f, nI = 0.0f;
+
+	for(int k = 1; k < n - 1; ++k)
+	{
+		const struct MaggieTransVertex *vi = indx ? &vtx[indx[k]]     : &vtx[k];
+		const struct MaggieTransVertex *vj = indx ? &vtx[indx[k + 1]] : &vtx[k + 1];
+
+		float yi = vi->pos.y - v0->pos.y;
+		float yj = vj->pos.y - v0->pos.y;
+		denom += (vi->pos.x - v0->pos.x) * yj - (vj->pos.x - v0->pos.x) * yi;
+
+		nOow += (vi->pos.w    - v0->pos.w)    * yj - (vj->pos.w    - v0->pos.w)    * yi;
+		nUow += (vi->tex[0].u - v0->tex[0].u) * yj - (vj->tex[0].u - v0->tex[0].u) * yi;
+		nVow += (vi->tex[0].v - v0->tex[0].v) * yj - (vj->tex[0].v - v0->tex[0].v) * yi;
+		nZ   += (vi->pos.z    - v0->pos.z)    * yj - (vj->pos.z    - v0->pos.z)    * yi;
+		nI   += ((float)vi->colour - (float)v0->colour) * yj - ((float)vj->colour - (float)v0->colour) * yi;
+	}
+
+	if((denom > -1e-6f) && (denom < 1e-6f))
+	{
+		g->oowDDA = g->uowDDA = g->vowDDA = g->zDDA = g->iDDA = 0.0f;
+		return;
+	}
+	float ooDenom = 1.0f / denom;
+	g->oowDDA = nOow * ooDenom;
+	g->uowDDA = nUow * ooDenom;
+	g->vowDDA = nVow * ooDenom;
+	g->zDDA   = nZ   * ooDenom;
+	g->iDDA   = nI   * ooDenom;
+}
+
+/*****************************************************************************/
 
 /*****************************************************************************/
 
@@ -269,6 +348,9 @@ static void DrawTriangle(struct MaggieTransVertex *vtx0, struct MaggieTransVerte
 	if(maxy < vtx2->pos.y)
 		maxy = vtx2->pos.y;
 
+	ComputeGradients3(&lib->gradients, vtx0, vtx1, vtx2);
+	lib->polyIntensity = 0;			// 3 verts are always planar in intensity
+
 	DrawEdge(vtx0, vtx1, miny, maxy, lib);
 	DrawEdge(vtx1, vtx2, miny, maxy, lib);
 	DrawEdge(vtx2, vtx0, miny, maxy, lib);
@@ -314,10 +396,13 @@ static void DrawPolygon(struct MaggieTransVertex *vtx, int nVerts, MaggieBase *l
 			maxy = vtx[i].pos.y;
 		}
 	}
+	ComputeGradients(&lib->gradients, vtx, NULL, nVerts);
+	lib->polyIntensity = lib->sourceIsPoly && (nVerts > 3);
+
 	int prev = nVerts - 1;
 	for(int i = 0; i < nVerts; ++i)
 	{
-		DrawEdge(&vtx[prev], &vtx[i], miny, maxy, lib);	
+		DrawEdge(&vtx[prev], &vtx[i], miny, maxy, lib);
 		prev = i;
 	}
 	DrawSpans(miny, maxy, lib);
@@ -365,6 +450,9 @@ static void DrawIndexedPolygon(struct MaggieTransVertex *vtx, UWORD *indx, int n
 
 	if(maxy == miny)
 		return;
+
+	ComputeGradients(&lib->gradients, vtx, indx, nIndx);
+	lib->polyIntensity = lib->sourceIsPoly && (nIndx > 3);
 
 	int prev = nIndx - 1;
 	for(int i = 0; i < nIndx; ++i)
@@ -472,6 +560,7 @@ void FlushImmediateMode(MaggieBase *lib)
 
 void magDrawTriangles(REG(d0, UWORD startVtx), REG(d1, UWORD nVerts), REG(a6, MaggieBase *lib))
 {
+	lib->sourceIsPoly = 0;
 	VertexBufferMemory *vbMem = lib->vertexBuffers[lib->vBuffer];
 
 	TransformVertexPositions(vbMem->transVerts, vbMem->positions + startVtx, nVerts, lib);
@@ -543,6 +632,7 @@ static void DrawSpan(float leftPos, float rightPos, float leftWW, float leftUU, 
 
 void magDrawIndexedTriangles(REG(d0, UWORD startVtx), REG(d1, UWORD nVerts), REG(d2, UWORD startIndx), REG(d3, UWORD nIndx), REG(a6, MaggieBase *lib))
 {
+	lib->sourceIsPoly = 0;
 #if PROFILE
 	ULONG drawStart = GetClocks();
 #endif
@@ -647,6 +737,7 @@ void magDrawIndexedTriangles(REG(d0, UWORD startVtx), REG(d1, UWORD nVerts), REG
 
 void magDrawIndexedPolygons(REG(d0, UWORD startVtx), REG(d1, UWORD nVerts), REG(d2, UWORD startIndx), REG(d3, UWORD nIndx), REG(a6, MaggieBase *lib))
 {
+	lib->sourceIsPoly = 1;
 #if PROFILE
 	ULONG drawStart = GetClocks();
 #endif
@@ -808,6 +899,7 @@ static void ExpandSpriteBuffer(struct MaggieTransVertex *dest, struct MaggieSpri
 
 void magDrawSprites(REG(d0, UWORD startVtx), REG(d1, UWORD nSprites), REG(fp0, float spriteSize), REG(a6, MaggieBase *lib))
 {
+	lib->sourceIsPoly = 1;			// sprite quads: intensity may be non-planar -> safe per-scanline path
 	VertexBufferMemory *vbMem = lib->vertexBuffers[lib->vBuffer];
 	TransformToSpriteBuffer(spriteBufferUP, &vbMem->positions[startVtx], nSprites, lib);
 	ExpandSpriteBuffer(transVtxBufferUP, spriteBufferUP, nSprites, spriteSize * 0.5f, lib);
@@ -854,6 +946,7 @@ void magDrawSprites(REG(d0, UWORD startVtx), REG(d1, UWORD nSprites), REG(fp0, f
 
 void magDrawSpritesUP(REG(a0, struct MaggieSpriteVertex *vtx), REG(d0, UWORD nSprites), REG(fp0, float spriteSize), REG(a6, MaggieBase *lib))
 {
+	lib->sourceIsPoly = 0;			// sprite quads: always flat.
 	TransformSpriteBuffer(spriteBufferUP, vtx, nSprites, lib);
 	ExpandSpriteBuffer(transVtxBufferUP, spriteBufferUP, nSprites, spriteSize * 0.5f, lib);
 	int clipRes = ComputeClipCodes(transClipCodesUP, transVtxBufferUP, nSprites * 4);

@@ -41,36 +41,41 @@
 	sub.l	d3,d4					;len = x1 - x0
 	ble		.noPixels
 
-	fadd	d3,e4,e2
-	fsub	e0,e1,e3	; xDiff = xRight - xLeft
+	fadd	d3,e4,e2				; xStart + 1
 
 	lea		(a3,d3.l*.bpp),a1			;dstColPtr = pixels + xStart
 	move.l	a1,Maggie_pixDest(a0)
-	lea		(a4,d3.l*2),a1			;dstColPtr = zbuffer + xStart
+	lea		(a4,d3.l*2),a1			;dstDepthPtr = zbuffer + xStart
 	move.l	a1,Maggie_depthDest(a0)
 
+	; Per-polygon fan-sum gradients for oow/u/v/z (both paths).
+	GetGradientsPtr a1
+	fmove.s	Grad_zDDA(a1),e11		; zDDA
+	fmove.s	Grad_oowDDA(a1),e15		; wDDA
+	fmove.s	Grad_uowDDA(a1),e18		; uDDA
+	fmove.s	Grad_vowDDA(a1),e21		; vDDA
+
 	fmove.s	EPos_zLeft(a2),e10		; zLeft
-	fmove.s	EPos_zRight(a2),e11		; zRight
-	fsub	e0,e2,e2				;preStep = 1 + xStart - edges[i].xPosLeft
-	fdiv	e3,e4,e3	; ooXLength = 1.0f / xDiff
 	fmove.s	EPos_iLeft(a2),e12		; iowLeft
-	fmove.s	EPos_iRight(a2),e13		; iowRight
 	fmove.s	EPos_oowLeft(a2),e14	; oowLeft
-	fmove.s	EPos_oowRight(a2),e15	; oowRight
 	fmove.s	EPos_uowLeft(a2),e17	; uowLeft
-	fmove.s	EPos_uowRight(a2),e18	; uowRight
 	fmove.s	EPos_vowLeft(a2),e20	; vowLeft
-	fmove.s	EPos_vowRight(a2),e21	; vowRight
-	fsub	e10,e11					; zDiff = zRight - zLeft
-	fsub	e12,e13					; iDiff = iRight - iLeft
-	fsub	e14,e15					; wDiff = oowRight - oowLeft
-	fsub	e17,e18					; uDiff = uRight - uLeft
-	fsub	e20,e21					; vDiff = vRight - vLeft
-	fmul	e3,e11					; zDDA = zDiff * ooXLength
+
+	fsub	e0,e2,e2				; preStep = 1 + xStart - xPosLeft
+
+	ifne	.polyIntensity
+	; polygon path: intensity is non-planar across >3 verts - interpolate
+	; per-scanline (edge to edge), which needs the reciprocal.
+	fsub	e0,e1,e3				; xDiff = xRight - xLeft
+	fdiv	e3,e4,e3				; ooXLength = 1.0f / xDiff
+	fmove.s	EPos_iRight(a2),e13		; iowRight
+	fsub	e12,e13					; iDiff = iowRight - iowLeft
 	fmul	e3,e13					; iDDA = iDiff * ooXLength
-	fmul	e3,e15					; wDDA = wDiff * ooXLength
-	fmul	e3,e18					; uDDA = uDiff * ooXLength
-	fmul	e3,e21					; vDDA = vDiff * ooXLength
+	else
+	; triangle path: intensity is planar, take it from the fan-sum gradient.
+	fmove.s	Grad_iDDA(a1),e13		; iDDA
+	endc
+
 	fmul	e2,e11,e7				; preStepZ = preStep * zDDA
 	fmul	e2,e13,e8				; preStepI = preStep * iDDA
 	fmul	e2,e15,e16				; preStepW = preStep * wDDA

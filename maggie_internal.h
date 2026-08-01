@@ -209,6 +209,13 @@ struct MaggieBase
 		magEdgePosAffine magEdgeAffine[MAGGIE_MAX_YRES];
 	};
 
+	// Per-polygon fan-sum gradients: written by ComputeGradients, read by the
+	// perspective+depth rasterizer via GetGradientsPtr. Placed right after the
+	// magEdge union so the hardcoded asm offsets (xres/screen/depth/scissor/edges
+	// = 100/104/108/456/472) stay put. Its own offset is guarded by a
+	// _Static_assert in maggie_draw.c against GetGradientsPtr in raster_structs.i.
+	magGradients gradients;
+
 	/*******************/
 
 	int vBuffer;
@@ -255,6 +262,16 @@ struct MaggieBase
 #endif
 	int frameCounter;
 	APTR dummyTextureData;
+
+	// Two-path rasterizer selection (C-side only, not read by asm):
+	// sourceIsPoly = the primitive being drawn came from magDrawIndexedPolygons.
+	// polyIntensity = use the per-scanline intensity rasterizer path, set by the
+	// draw dispatchers to (sourceIsPoly && vertexCount > 3): a >3-vertex polygon
+	// has non-planar Gouraud intensity that the fan-sum gradient can't represent,
+	// so it needs edge-to-edge interpolation. Triangles (and clipped-to-triangle
+	// polys, and clipped triangles that became polys) are planar -> triangle path.
+	int sourceIsPoly;
+	int polyIntensity;
 };
 
 /*****************************************************************************/

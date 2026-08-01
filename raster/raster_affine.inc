@@ -3,10 +3,6 @@
 
 	movem.l    d2-d5/a2-a4,-(a7)
 
-	move.l	d1,d2
-	lsr.l	#1,d2
-	mulu.w	#EAffPos_Size,d2
-
 	fmove.w	#1,e4
 	lea		$dff250,a0
 
@@ -14,32 +10,35 @@
 
 	GetEdgesPtr a2
 
+	; Per-polygon fan-sum gradients (both paths): u/v hoisted once.
+	GetGradientsPtr a1
+	fmove.s	Grad_uowDDA(a1),e18		; uDDA
+	fmove.s	Grad_vowDDA(a1),e21		; vDDA
+	fmove.l	e18,Maggie_uDelta(a0)
+	fmove.l	e21,Maggie_vDelta(a0)
+	ifne	.polyIntensity
+	; polygon path: intensity is non-planar - approximate with a single DDA taken
+	; from the middle scanline (the midpoint trick): one divide, still hoisted.
+	move.l	d4,d2
+	lsr.l	#1,d2
+	mulu.w	#EAffPos_Size,d2
 	fmove.s	EAffPos_xPosRight(a2,d2),e0
-	fsub.s	EAffPos_xPosLeft(a2,d2),e0
-	fdiv	e0,e4,e0
-
-	fmove.s	EAffPos_iRight(a2,d2),e13		; iRight
-	fmove.s	EAffPos_uRight(a2,d2),e18 		; uLeft
-	fmove.s	EAffPos_vRight(a2,d2),e21		; vLeft
-	fsub.s	EAffPos_iLeft(a2,d2),e13		; iDDA = iRight - iLeft
-	fsub.s	EAffPos_uLeft(a2,d2),e18		; uDDA = uRight - uLeft
-	fsub.s	EAffPos_vLeft(a2,d2),e21 		; vDDA = vLeft - vRight
+	fsub.s	EAffPos_xPosLeft(a2,d2),e0	; xDiff at middle scanline
+	fdiv	e0,e4,e0					; ooXLength = 1 / xDiff
+	fmove.s	EAffPos_iRight(a2,d2),e13
+	fsub.s	EAffPos_iLeft(a2,d2),e13	; iDiff at middle scanline
+	fmul	e0,e13						; iDDA = iDiff * ooXLength
+	else
+	; triangle path: intensity is planar, take it from the fan-sum gradient.
+	fmove.s	Grad_iDDA(a1),e13			; iDDA
+	endc
+	fmoverz.l	e13,d3
+	move.w	d3,Maggie_lightDelta(a0)	; hoisted (both paths)
 
 	GetXRes d2
 	mulu.w	d2,d0
-
-	fmul	e0,e13
-	fmul	e0,e18
-	fmul	e0,e21
-
 	GetScreenPtr a3
 	GetScissorPtr a4
-
-	fmoverz.l	e13,d3
-
-	move.w	d3,Maggie_lightDelta(a0)
-	fmove.l	e18,Maggie_uDelta(a0)	; uDDA = uDiff * ooXLength
-	fmove.l	e21,Maggie_vDelta(a0)	; vDDA = vDiff * ooXLength
 
 	lea		(a3,d0.l*.bpp),a3		; pixels
 .vLoop:

@@ -53,15 +53,21 @@ void DrawSpansSW16(int ymin, int ymax, MaggieBase *lib);
 /*****************************************************************************/
 
 void DrawScanlines32ZAffine(int ymin __asm("d0"), int ymax __asm("d1"), MaggieBase *lib __asm("a6"));
+void DrawScanlines32ZAffinePoly(int ymin __asm("d0"), int ymax __asm("d1"), MaggieBase *lib __asm("a6"));
 void DrawScanlines32Affine(int ymin __asm("d0"), int ymax __asm("d1"), MaggieBase *lib __asm("a6"));
+void DrawScanlines32AffinePoly(int ymin __asm("d0"), int ymax __asm("d1"), MaggieBase *lib __asm("a6"));
 
 void DrawScanlines16ZAffine(int ymin __asm("d0"), int ymax __asm("d1"), MaggieBase *lib __asm("a6"));
+void DrawScanlines16ZAffinePoly(int ymin __asm("d0"), int ymax __asm("d1"), MaggieBase *lib __asm("a6"));
 void DrawScanlines16Affine(int ymin __asm("d0"), int ymax __asm("d1"), MaggieBase *lib __asm("a6"));
+void DrawScanlines16AffinePoly(int ymin __asm("d0"), int ymax __asm("d1"), MaggieBase *lib __asm("a6"));
 
 void DrawScanlines32IZ(int ymin __asm("d0"), int ymax __asm("d1"), MaggieBase *lib __asm("a6"));
+void DrawScanlines32IZPoly(int ymin __asm("d0"), int ymax __asm("d1"), MaggieBase *lib __asm("a6"));
 void DrawScanlines32(int ymin __asm("d0"), int ymax __asm("d1"), MaggieBase *lib __asm("a6"));
 
 void DrawScanlines16IZ(int ymin __asm("d0"), int ymax __asm("d1"), MaggieBase *lib __asm("a6"));
+void DrawScanlines16IZPoly(int ymin __asm("d0"), int ymax __asm("d1"), MaggieBase *lib __asm("a6"));
 void DrawScanlines16(int ymin __asm("d0"), int ymax __asm("d1"), MaggieBase *lib __asm("a6"));
 
 /*****************************************************************************/
@@ -92,23 +98,34 @@ void DrawSpans(int miny, int maxy, MaggieBase *lib)
 		{
 			if(lib->drawMode & MAG_DRAWMODE_32BIT)
 			{
-				DrawScanlines32ZAffine(miny, maxy, lib);
+				if(lib->polyIntensity)
+					DrawScanlines32ZAffinePoly(miny, maxy, lib);
+				else
+					DrawScanlines32ZAffine(miny, maxy, lib);
 			}
 			else
 			{
-				DrawScanlines16ZAffine(miny, maxy, lib);
+				if(lib->polyIntensity)
+					DrawScanlines16ZAffinePoly(miny, maxy, lib);
+				else
+					DrawScanlines16ZAffine(miny, maxy, lib);
 			}
 		}
 		else
 		{
 			if(lib->drawMode & MAG_DRAWMODE_32BIT)
 			{
-				DrawScanlines32Affine(miny, maxy, lib);
+				if(lib->polyIntensity)
+					DrawScanlines32AffinePoly(miny, maxy, lib);
+				else
+					DrawScanlines32Affine(miny, maxy, lib);
 			}
 			else
 			{
-				DrawScanlines16Affine(miny, maxy, lib);
-
+				if(lib->polyIntensity)
+					DrawScanlines16AffinePoly(miny, maxy, lib);
+				else
+					DrawScanlines16Affine(miny, maxy, lib);
 			}
 		}
 	}
@@ -118,11 +135,17 @@ void DrawSpans(int miny, int maxy, MaggieBase *lib)
 		{
 			if(lib->drawMode & MAG_DRAWMODE_32BIT)
 			{
-				DrawScanlines32IZ(miny, maxy, lib);
+				if(lib->polyIntensity)
+					DrawScanlines32IZPoly(miny, maxy, lib);
+				else
+					DrawScanlines32IZ(miny, maxy, lib);
 			}
 			else
 			{
-				DrawScanlines16IZ(miny, maxy, lib);
+				if(lib->polyIntensity)
+					DrawScanlines16IZPoly(miny, maxy, lib);
+				else
+					DrawScanlines16IZ(miny, maxy, lib);
 			}
 		}
 		else

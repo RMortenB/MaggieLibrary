@@ -46,6 +46,14 @@
 		LONG Scsr_y1
 		LONG Scsr_Size
 
+	STRUCTURE Grad,0
+		FLOAT Grad_oowDDA
+		FLOAT Grad_uowDDA
+		FLOAT Grad_vowDDA
+		FLOAT Grad_zDDA
+		FLOAT Grad_iDDA
+		LONG Grad_Size
+
 	STRUCTURE MaggieRegs,0
 		APTR	Maggie_texture				;			/*  0 | 32bit texture source */
 		APTR	Maggie_pixDest				;			/*  4 | 32bit Destination Screen Addr */
@@ -84,4 +92,7 @@ GetEdgesPtr MACRO
 ENDM
 GetScissorPtr MACRO
 	lea		456(a6),\1
+ENDM
+GetGradientsPtr MACRO
+	lea		52312(a6),\1
 ENDM
