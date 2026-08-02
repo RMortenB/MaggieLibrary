@@ -3,6 +3,36 @@
 
  The maggie.library is a helper library to draw texture mapped geometry with the Maggie chipset.
 
+### Linking: shared library or static
+
+There are two ways to pull maggie into your program, both built from the same sources.
+
+**Shared library (the default).** Open `maggie.library` at runtime like any other Amiga library, and include `<proto/Maggie.h>`:
+```
+struct Library *MaggieBase = OpenLibrary("maggie.library", 0);
+...
+CloseLibrary(MaggieBase);
+```
+
+**Statically linked.** Link the library straight into your executable, so there is no `maggie.library` to install or open at runtime.
+
+1. Build `libmaggie.a` from the repo root with `make static` (a plain `make` builds both the shared and static versions).
+2. Include `<proto/Maggie_static.h>` instead of `<proto/Maggie.h>`.
+3. Replace the `OpenLibrary`/`CloseLibrary` pair with `magCreateContext` / `magDeleteContext`:
+```
+struct Library *MaggieBase = magCreateContext();
+...
+magDeleteContext(MaggieBase);
+```
+4. Link `libmaggie.a` into your program. It needs `-lamiga` and `-lm`, and the archive must come before them so its libc/libm references resolve:
+```
+gcc ... myprog.o libmaggie.a -lamiga -lm -o myprog
+```
+
+Every other `magFoo(...)` call is identical between the two modes — the library base is still hidden behind the global `MaggieBase`. The one requirement is that the static objects are built with the same float/CPU ABI as your program (`-m68080 -mhard-float`); `-fomit-frame-pointer` is recommended so `a6` is free for the hidden base.
+
+See `samples/StaticCube` for a complete example — it is the `QuadCube` demo with only those three changes.
+
 ### Drawing with the maggie.library is sort of simple
 
 All calls to maggie for drawing a given frame should be wrapped in

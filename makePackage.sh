@@ -23,6 +23,10 @@ mkdir package/samples/QuadCube
 cp samples/QuadCube/quadcube.c package/samples/QuadCube
 cp samples/QuadCube/Makefile package/samples/QuadCube
 
+mkdir package/samples/StaticCube
+cp samples/StaticCube/staticcube.c package/samples/StaticCube
+cp samples/StaticCube/Makefile package/samples/StaticCube
+
 mkdir package/samples/UserProvided
 cp samples/UserProvided/userdraw.c package/samples/UserProvided
 cp samples/UserProvided/Makefile package/samples/UserProvided
@@ -59,6 +63,8 @@ mkdir package/libs
 make
 make strip
 cp maggie.library package/libs
+
+cp libmaggie.a package/libmaggie.a
 make clean
 
 cp Readme.txt package/
@@ -92,6 +98,13 @@ cd QuadCube
 make
 make strip
 cp QuadCube ../../bin
+make clean
+cd ..
+
+cd StaticCube
+make
+make strip
+cp StaticCube ../../bin
 make clean
 cd ..
 

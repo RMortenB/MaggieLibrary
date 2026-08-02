@@ -6,6 +6,9 @@
 
 - [maggie.library API Documentation](#maggielibrary-api-documentation)
 	- [Table of Contents](#table-of-contents)
+	- [Linkage: Shared or Static](#linkage-shared-or-static)
+		- [magCreateContext](#magcreatecontext)
+		- [magDeleteContext](#magdeletecontext)
 	- [Screen and Drawing Setup](#screen-and-drawing-setup)
 		- [magSetScreenMemory](#magsetscreenmemory)
 		- [magSetTexture](#magsettexture)
@@ -81,6 +84,50 @@ MaggieLibrary is a 3D graphics rendering library for Amiga systems, providing fu
 - In addition, some functions will destroy the contents of all En registers.
 - Other than the Maggie registers, no hardware registers are modified.
 - The floating point rounding mode is assumed to be `To Zero` (RZ).
+
+## Linkage: Shared or Static
+
+maggie ships in two forms, built from the same sources:
+
+- **`maggie.library`** — the resident/shared library. Open it at runtime with `OpenLibrary("maggie.library", 0)`, include `<proto/Maggie.h>`, and close it with `CloseLibrary`.
+- **`libmaggie.a`** — a static archive linked straight into your executable (`make static` from the repo root). Include `<proto/Maggie_static.h>` instead of `<proto/Maggie.h>`, and link the archive before `-lamiga -lm`.
+
+Every `magFoo(...)` entry point documented below is identical in both modes; the library base is passed in `a6` and hidden behind the global `MaggieBase`. Only the acquire/release of that base differs: `OpenLibrary`/`CloseLibrary` for the shared library, and `magCreateContext`/`magDeleteContext` (below) for the static archive. The static objects must be built with the same `-m68080 -mhard-float` ABI as the calling program. See `samples/StaticCube` for a worked example.
+
+### magCreateContext
+
+```c
+struct Library *magCreateContext(void);
+```
+Create a maggie context for the statically linked library. This replaces `OpenLibrary("maggie.library", ...)`: it allocates and initialises the library base — FPU rounding mode, graphics.library, the scene semaphore, the depth buffer and the handle tables — exactly as the resident library's auto-init does.
+
+- Inputs
+  - None
+
+- Outputs
+  - Pointer to the library base, or `NULL` on failure.
+
+- Notes
+  - Only available in the static build (`libmaggie.a` + `<proto/Maggie_static.h>`).
+  - Store the result in the global `MaggieBase`, just as you would the result of `OpenLibrary`; every other call finds the base there.
+  - Pair each successful call with `magDeleteContext`.
+
+### magDeleteContext
+
+```c
+void magDeleteContext(struct Library *base);
+```
+Tear down a context created by `magCreateContext`. Frees the depth buffer, any vertex/index buffers and textures still allocated, and closes graphics.library. This replaces `CloseLibrary`.
+
+- Inputs
+  - base
+    - The base returned by `magCreateContext`. A `NULL` base is ignored.
+
+- Outputs
+  - None
+
+- Notes
+  - Only available in the static build.
 
 ## Screen and Drawing Setup
 ### magSetScreenMemory
