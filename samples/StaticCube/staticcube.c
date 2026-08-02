@@ -5,14 +5,8 @@
 /*
  * StaticCube - the QuadCube demo, linked against the STATIC library
  * (libmaggie.a) instead of opening maggie.library at runtime.
- *
- * The only differences from samples/QuadCube are:
- *   - include <proto/Maggie_static.h> instead of <proto/Maggie.h>
- *   - MaggieBase = magCreateContext();   (instead of OpenLibrary)
- *   - magDeleteContext(MaggieBase);       (instead of CloseLibrary)
- * Every magFoo(...) call site is byte-for-byte identical to the shared-library
- * build - the base is still hidden behind the global MaggieBase.
  */
+
 #include <proto/Maggie_static.h>
 #include <maggie_vec.h>
 #include <maggie_vertex.h>
