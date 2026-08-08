@@ -8,9 +8,17 @@ void DrawPolygon1Pass(const magGradients *gradients, struct MaggieTransVertex *v
 float getBestDistance3(magGradients *res, const struct MaggieTransVertex *vtx);
 float getBestDistance(magGradients *res, const struct MaggieTransVertex *vtx, int nVerts);
 
-// The perspective+depth rasterizer reads lib->gradients at a hardcoded offset
-// (GetGradientsPtr in raster_structs.i). Keep the two in lockstep.
-_Static_assert(__builtin_offsetof(MaggieBase, gradients) == 52312, "gradients offset changed - update GetGradientsPtr in raster_structs.i");
+// The asm reaches into MaggieBase at hardcoded offsets (MB_* in
+// raster/raster_structs.i): the perspective+depth rasterizer reads gradients via
+// GetGradientsPtr, and MaggieSetupTri reads cullSign and writes primMinY/primMaxY.
+// Keep these in lockstep - a layout change must fail the build here, not corrupt
+// a field at runtime.
+_Static_assert(__builtin_offsetof(MaggieBase, gradients) == 52312, "MB_gradients in raster/raster_structs.i is stale");
+_Static_assert(__builtin_offsetof(MaggieBase, cullSign) == 175594, "MB_cullSign in raster/raster_structs.i is stale");
+_Static_assert(__builtin_offsetof(MaggieBase, primMinY) == 175598, "MB_primMinY in raster/raster_structs.i is stale");
+_Static_assert(__builtin_offsetof(MaggieBase, primMaxY) == 175602, "MB_primMaxY in raster/raster_structs.i is stale");
+/*****************************************************************************/
+
 /*****************************************************************************/
 
 static void SetupHW(MaggieBase *lib)
@@ -64,6 +72,61 @@ static void SetupHW(MaggieBase *lib)
 
 /*****************************************************************************/
 
+// A batch with no Maggie or no bound texture rasterizes nothing, so reject it
+// before transforming/lighting/clipping anything. This test used to sit in
+// DrawSpans and ran once per primitive.
+
+static int CanDraw(MaggieBase *lib)
+{
+	if((!lib->hasMaggie) || (lib->txtrIndex == 0xffff))
+		return 0;
+	return lib->textures[lib->txtrIndex] != NULL;
+}
+
+/*****************************************************************************/
+
+// Hoist everything that depends only on drawMode / the bound texture out of the
+// per-primitive and per-edge path. Called once per magDraw* call, right where
+// SetupHW() used to be.
+
+static void BeginDrawBatch(MaggieBase *lib)
+{
+	SetupHW(lib);
+
+	UWORD mode = lib->drawMode;
+
+	// xPosLeft/xPosRight sit at offset 0/4 of both edge layouts, so the two
+	// column bases are the same for affine and perspective.
+	UBYTE *left = (UBYTE *)lib->magEdge;
+	UBYTE *right = left + sizeof(float);
+
+	if(mode & MAG_DRAWMODE_AFFINE_MAPPING)
+	{
+		lib->drawLineFunc = DrawLineAffineAsm;
+		lib->edgeStride = sizeof(magEdgePosAffine);
+	}
+	else
+	{
+		lib->drawLineFunc = DrawLineAsm;
+		lib->edgeStride = sizeof(magEdgePos);
+	}
+
+	if(mode & MAG_DRAWMODE_CULL_CCW)
+	{
+		lib->edgeBaseDown = right;
+		lib->edgeBaseUp = left;
+		lib->cullSign = -1.0f;
+	}
+	else
+	{
+		lib->edgeBaseDown = left;
+		lib->edgeBaseUp = right;
+		lib->cullSign = 1.0f;
+	}
+
+	SelectScanFunctions(lib);
+}
+
 /*****************************************************************************/
 
 #define CLIPPED_OUT		0
@@ -73,90 +136,11 @@ static void SetupHW(MaggieBase *lib)
 /*****************************************************************************/
 /*****************************************************************************/
 
-static float TriangleArea(vec4 *p0, vec4 *p1, vec4 *p2)
-{
-	float x0 = p1->x - p0->x;
-	float y0 = p1->y - p0->y;
-	float x1 = p2->x - p0->x;
-	float y1 = p2->y - p0->y;
-
-	return x0 * y1 - x1 * y0;
-}
-
-/*****************************************************************************/
-
-// Per-polygon horizontal (d/dx) attribute gradients via fan-sum.
-// oow=1/w, uow=u/w, vow=v/w, z and i are all affine in screen space, so each
-// gradient is a single polygon constant: A_f = sum(num_i) / sum(denom_i) over
-// the fan (v0, v_i, v_j), where sum(denom_i) == 2*signed area. Conditioning
-// follows the total polygon area, not any one scanline's width, which is why
-// this replaces the per-scanline (right-left)/dx the rasterizer does today.
-// The attribute->field mapping matches what DrawLine interpolates into magEdge.
-
-static void ComputeGradients3(magGradients *g,
-	const struct MaggieTransVertex *v0,
-	const struct MaggieTransVertex *v1,
-	const struct MaggieTransVertex *v2)
-{
-	float x1 = v1->pos.x - v0->pos.x;
-	float y1 = v1->pos.y - v0->pos.y;
-	float x2 = v2->pos.x - v0->pos.x;
-	float y2 = v2->pos.y - v0->pos.y;
-
-	float denom = x1 * y2 - x2 * y1;
-	if((denom > -1e-6f) && (denom < 1e-6f))
-	{
-		g->oowDDA = g->uowDDA = g->vowDDA = g->zDDA = g->iDDA = 0.0f;
-		return;
-	}
-	float ooDenom = 1.0f / denom;
-
-	g->oowDDA = ((v1->pos.w    - v0->pos.w)    * y2 - (v2->pos.w    - v0->pos.w)    * y1) * ooDenom;
-	g->uowDDA = ((v1->tex[0].u - v0->tex[0].u) * y2 - (v2->tex[0].u - v0->tex[0].u) * y1) * ooDenom;
-	g->vowDDA = ((v1->tex[0].v - v0->tex[0].v) * y2 - (v2->tex[0].v - v0->tex[0].v) * y1) * ooDenom;
-	g->zDDA   = ((v1->pos.z    - v0->pos.z)    * y2 - (v2->pos.z    - v0->pos.z)    * y1) * ooDenom;
-	g->iDDA   = (((float)v1->colour - (float)v0->colour) * y2 - ((float)v2->colour - (float)v0->colour) * y1) * ooDenom;
-}
-
-/*****************************************************************************/
-
-static void ComputeGradients(magGradients *g, const struct MaggieTransVertex *vtx, const UWORD *indx, int n)
-{
-	const struct MaggieTransVertex *v0 = indx ? &vtx[indx[0]] : &vtx[0];
-
-	float denom = 0.0f;
-	float nOow = 0.0f, nUow = 0.0f, nVow = 0.0f, nZ = 0.0f, nI = 0.0f;
-
-	for(int k = 1; k < n - 1; ++k)
-	{
-		const struct MaggieTransVertex *vi = indx ? &vtx[indx[k]]     : &vtx[k];
-		const struct MaggieTransVertex *vj = indx ? &vtx[indx[k + 1]] : &vtx[k + 1];
-
-		float yi = vi->pos.y - v0->pos.y;
-		float yj = vj->pos.y - v0->pos.y;
-		denom += (vi->pos.x - v0->pos.x) * yj - (vj->pos.x - v0->pos.x) * yi;
-
-		nOow += (vi->pos.w    - v0->pos.w)    * yj - (vj->pos.w    - v0->pos.w)    * yi;
-		nUow += (vi->tex[0].u - v0->tex[0].u) * yj - (vj->tex[0].u - v0->tex[0].u) * yi;
-		nVow += (vi->tex[0].v - v0->tex[0].v) * yj - (vj->tex[0].v - v0->tex[0].v) * yi;
-		nZ   += (vi->pos.z    - v0->pos.z)    * yj - (vj->pos.z    - v0->pos.z)    * yi;
-		nI   += ((float)vi->colour - (float)v0->colour) * yj - ((float)vj->colour - (float)v0->colour) * yi;
-	}
-
-	if((denom > -1e-6f) && (denom < 1e-6f))
-	{
-		g->oowDDA = g->uowDDA = g->vowDDA = g->zDDA = g->iDDA = 0.0f;
-		return;
-	}
-	float ooDenom = 1.0f / denom;
-	g->oowDDA = nOow * ooDenom;
-	g->uowDDA = nUow * ooDenom;
-	g->vowDDA = nVow * ooDenom;
-	g->zDDA   = nZ   * ooDenom;
-	g->iDDA   = nI   * ooDenom;
-}
-
-/*****************************************************************************/
+// The per-polygon gradient maths - the fan-sum described in MaggieSetupPoly -
+// now lives entirely in asm: maggie_setuptri.s for triangles, maggie_setuppoly.s
+// for n-gons. Both files carry the derivation and the numerical notes (why the
+// reciprocal is applied after the cancellation, and why the two routines need
+// opposite signs for it).
 
 /*****************************************************************************/
 
@@ -187,9 +171,13 @@ static int ComputeClipCodes(UBYTE *clipCodes, struct MaggieTransVertex *vtx, UWO
 		in |= clipCodes[i];
 	}
 	if(out)
+	{
 		return CLIPPED_OUT;
+	}
 	if(!in)
+	{
 		return CLIPPED_IN;
+	}
 	return CLIPPED_PARTIAL;
 }
 
@@ -211,7 +199,7 @@ static void NormaliseVertexBuffer(struct MaggieTransVertex *vtx, int nVerts, UBY
 
 			vtx[i].pos.x = offsetScaleX * (vtx[i].pos.x * oow + 1.0f);
 			vtx[i].pos.y = offsetScaleY * (vtx[i].pos.y * oow + 1.0f);
-			vtx[i].pos.z = vtx[i].pos.z * oow * 65536.0f * 65535.0f;
+			vtx[i].pos.z = vtx[i].pos.z * oow * 4294901760.0f;	// 65536.0f * 65535.0f
 			vtx[i].pos.w = oow;
 		}
 	}
@@ -226,7 +214,7 @@ static void NormaliseVertexBuffer(struct MaggieTransVertex *vtx, int nVerts, UBY
 
 			vtx[i].pos.x = offsetScaleX * (vtx[i].pos.x * oow + 1.0f);
 			vtx[i].pos.y = offsetScaleY * (vtx[i].pos.y * oow + 1.0f);
-			vtx[i].pos.z = vtx[i].pos.z * oow * 65536.0f * 65535.0f;
+			vtx[i].pos.z = vtx[i].pos.z * oow * 4294901760.0f;	// 65536.0f * 65535.0f
 			vtx[i].pos.w = oow;
 			for(int j = 0; j < MAGGIE_MAX_TEXCOORDS; ++j)
 			{
@@ -252,7 +240,7 @@ static void NormaliseClippedVertexBuffer(struct MaggieTransVertex *vtx, int nVer
 
 			vtx[i].pos.x = offsetScaleX * (vtx[i].pos.x * oow + 1.0f);
 			vtx[i].pos.y = offsetScaleY * (vtx[i].pos.y * oow + 1.0f);
-			vtx[i].pos.z = vtx[i].pos.z * oow * 65536.0f * 65535.0f;
+			vtx[i].pos.z = vtx[i].pos.z * oow * 4294901760.0f;	// 65536.0f * 65535.0f
 			vtx[i].pos.w = oow;
 		}
 	}
@@ -264,7 +252,7 @@ static void NormaliseClippedVertexBuffer(struct MaggieTransVertex *vtx, int nVer
 
 			vtx[i].pos.x = offsetScaleX * (vtx[i].pos.x * oow + 1.0f);
 			vtx[i].pos.y = offsetScaleY * (vtx[i].pos.y * oow + 1.0f);
-			vtx[i].pos.z = vtx[i].pos.z * oow * 65536.0f * 65535.0f;
+			vtx[i].pos.z = vtx[i].pos.z * oow * 4294901760.0f;	// 65536.0f * 65535.0f
 			vtx[i].pos.w = oow;
 			for(int j = 0; j < MAGGIE_MAX_TEXCOORDS; ++j)
 			{
@@ -277,135 +265,46 @@ static void NormaliseClippedVertexBuffer(struct MaggieTransVertex *vtx, int nVer
 
 /*****************************************************************************/
 
-int my_abs(int v)
-{
-	if(v < 0)
-		return -v;
-	return v;
-}
-
-/*****************************************************************************/
-
-static void DrawScreenLine(MaggieBase *lib, int x0, int y0, int x1, int y1)
-{
-	int dx = my_abs(x1 - x0);
-	int dy = my_abs(y1 - y0);
-	int sx = (x0 < x1) ? 1 : -1;
-	int sy = (y0 < y1) ? 1 : -1;
-	int err = dx - dy;
-	int e2;
-	ULONG *screen = (ULONG *)lib->screen;
-	for(;;)
-	{
-		if((x0 > lib->scissor.x0) && (x0 < lib->scissor.x1) && (y0 > lib->scissor.y0) && (y0 < lib->scissor.y1))
-			screen[y0 * lib->xres + x0] = 0xffffff;
-
-		if((x0 == x1) && (y0 == y1))
-			break;
-
-		e2 = 2 * err;
-		if(e2 > -dy)
-		{
-			err -= dy;
-			x0 += sx;
-		}
-		if(e2 < dx)
-		{
-			err += dx;
-			y0 += sy;
-		}
-	}
-}
-
-/*****************************************************************************/
+// Cull, screen-y span and the five attribute gradients all live in
+// MaggieSetupTri (maggie_setuptri.s) - see the note on its prototype for why.
+// 3 verts are always planar in intensity, so scanFunc stays scanFuncFlat.
 
 static void DrawTriangle(struct MaggieTransVertex *vtx0, struct MaggieTransVertex *vtx1, struct MaggieTransVertex *vtx2, MaggieBase *lib)
 {
-	float area = TriangleArea(&vtx0->pos, &vtx1->pos, &vtx2->pos);
-
-	if(lib->drawMode & MAG_DRAWMODE_CULL_CCW)
-		area = -area;
-	if(area > 0.0f)
+	if(!MaggieSetupTri(vtx0, vtx1, vtx2, lib))
 		return;
 
-	if(lib->frameCounter & 1)
-	{
-		DrawScreenLine(lib, vtx0->pos.x, vtx0->pos.y, vtx1->pos.x, vtx1->pos.y);
-		DrawScreenLine(lib, vtx1->pos.x, vtx1->pos.y, vtx2->pos.x, vtx2->pos.y);
-		DrawScreenLine(lib, vtx2->pos.x, vtx2->pos.y, vtx0->pos.x, vtx0->pos.y);
-		return;
-	}
+	int miny = lib->primMinY;
 
-	int miny = vtx0->pos.y;
-	if(miny > vtx1->pos.y)
-		miny = vtx1->pos.y;
-	if(miny > vtx2->pos.y)
-		miny = vtx2->pos.y;
-
-	int maxy = vtx0->pos.y;
-	if(maxy < vtx1->pos.y)
-		maxy = vtx1->pos.y;
-	if(maxy < vtx2->pos.y)
-		maxy = vtx2->pos.y;
-
-	ComputeGradients3(&lib->gradients, vtx0, vtx1, vtx2);
-	lib->polyIntensity = 0;			// 3 verts are always planar in intensity
-
-	DrawEdge(vtx0, vtx1, miny, maxy, lib);
-	DrawEdge(vtx1, vtx2, miny, maxy, lib);
-	DrawEdge(vtx2, vtx0, miny, maxy, lib);
-	DrawSpans(miny, maxy, lib);
+	DrawEdge(vtx0, vtx1, miny, lib);
+	DrawEdge(vtx1, vtx2, miny, lib);
+	DrawEdge(vtx2, vtx0, miny, lib);
+	DrawSpans(miny, lib->primMaxY, lib);
 }
 
 /*****************************************************************************/
+
+// Cull, screen-y span and the five attribute gradients all live in
+// MaggieSetupPoly (maggie_setuppoly.s) - see the note on its prototype.
 
 static void DrawPolygon(struct MaggieTransVertex *vtx, int nVerts, MaggieBase *lib)
 {
 	if(nVerts < 3)
 		return;
 
-	float area = TriangleArea(&vtx[0].pos, &vtx[1].pos, &vtx[2].pos);
-	for(int i = 2; i < nVerts - 1; ++i)
-	{
-		area += TriangleArea(&vtx[0].pos, &vtx[i].pos, &vtx[i + 1].pos);
-	}
-
-	if(lib->drawMode & MAG_DRAWMODE_CULL_CCW)
-		area = -area;
-	if(area >= 0.0f)
+	if(!MaggieSetupPoly(vtx, NULL, nVerts, lib))
 		return;
 
-	if(lib->frameCounter & 1)
-	{
-		for(int i = 0; i < nVerts; ++i)
-		{
-			DrawScreenLine(lib, vtx[i].pos.x, vtx[i].pos.y, vtx[(i + 1) % nVerts].pos.x, vtx[(i + 1) % nVerts].pos.y);
-		}
-		return;
-	}
-	int miny = vtx[0].pos.y;
-	int maxy = vtx[0].pos.y;
-	for(int i = 1; i < nVerts; ++i)
-	{
-		if(miny > vtx[i].pos.y)
-		{
-			miny = vtx[i].pos.y;
-		}
-		if(maxy < vtx[i].pos.y)
-		{
-			maxy = vtx[i].pos.y;
-		}
-	}
-	ComputeGradients(&lib->gradients, vtx, NULL, nVerts);
-	lib->polyIntensity = lib->sourceIsPoly && (nVerts > 3);
+	lib->scanFunc = (nVerts > 3) ? lib->scanFuncPoly : lib->scanFuncFlat;
 
+	int miny = lib->primMinY;
 	int prev = nVerts - 1;
 	for(int i = 0; i < nVerts; ++i)
 	{
-		DrawEdge(&vtx[prev], &vtx[i], miny, maxy, lib);
+		DrawEdge(&vtx[prev], &vtx[i], miny, lib);
 		prev = i;
 	}
-	DrawSpans(miny, maxy, lib);
+	DrawSpans(miny, lib->primMaxY, lib);
 }
 
 /*****************************************************************************/
@@ -415,52 +314,19 @@ static void DrawIndexedPolygon(struct MaggieTransVertex *vtx, UWORD *indx, int n
 	if(nIndx < 3)
 		return;
 
-	float area = TriangleArea(&vtx[indx[0]].pos, &vtx[indx[1]].pos, &vtx[indx[2]].pos);
-	for(int i = 2; i < nIndx - 1; ++i)
-	{
-		area += TriangleArea(&vtx[indx[0]].pos, &vtx[indx[i]].pos, &vtx[indx[i + 1]].pos);
-	}
-	if(lib->drawMode & MAG_DRAWMODE_CULL_CCW)
-		area = -area;
-	if(area >= 0.0f)
+	if(!MaggieSetupPoly(vtx, indx, nIndx, lib))
 		return;
 
-	if(lib->frameCounter & 1)
-	{
-		for(int i = 0; i < nIndx; ++i)
-		{
-			DrawScreenLine(lib, vtx[indx[i]].pos.x, vtx[indx[i]].pos.y, vtx[indx[(i + 1) % nIndx]].pos.x, vtx[indx[(i + 1) % nIndx]].pos.y);
-		}
-		return;
-	}
-	int miny = vtx[indx[0]].pos.y;
-	int maxy = vtx[indx[0]].pos.y;
+	lib->scanFunc = (nIndx > 3) ? lib->scanFuncPoly : lib->scanFuncFlat;
 
-	for(int i = 1; i < nIndx; ++i)
-	{
-		if(miny > vtx[indx[i]].pos.y)
-		{
-			miny = vtx[indx[i]].pos.y;
-		}
-		if(maxy < vtx[indx[i]].pos.y)
-		{
-			maxy = vtx[indx[i]].pos.y;
-		}
-	}
-
-	if(maxy == miny)
-		return;
-
-	ComputeGradients(&lib->gradients, vtx, indx, nIndx);
-	lib->polyIntensity = lib->sourceIsPoly && (nIndx > 3);
-
+	int miny = lib->primMinY;
 	int prev = nIndx - 1;
 	for(int i = 0; i < nIndx; ++i)
 	{
-		DrawEdge(&vtx[indx[prev]], &vtx[indx[i]], miny, maxy, lib);
+		DrawEdge(&vtx[indx[prev]], &vtx[indx[i]], miny, lib);
 		prev = i;
 	}
-	DrawSpans(miny, maxy, lib);
+	DrawSpans(miny, lib->primMaxY, lib);
 }
 
 /*****************************************************************************/
@@ -560,13 +426,26 @@ void FlushImmediateMode(MaggieBase *lib)
 
 void magDrawTriangles(REG(d0, UWORD startVtx), REG(d1, UWORD nVerts), REG(a6, MaggieBase *lib))
 {
+#if PROFILE
+	ULONG drawStart = GetClocks();
+#endif
+	if(!CanDraw(lib))
+		return;
+
 	lib->sourceIsPoly = 0;
 	VertexBufferMemory *vbMem = lib->vertexBuffers[lib->vBuffer];
 
 	TransformVertexPositions(vbMem->transVerts, vbMem->positions + startVtx, nVerts, lib);
 
 	int clipRes = ComputeClipCodes(vbMem->clipCodes, vbMem->transVerts, nVerts);
-
+#if PROFILE
+	if(clipRes == CLIPPED_OUT)
+		lib->profile.clipOut++;
+	else if(clipRes == CLIPPED_IN)
+		lib->profile.clipIn++;
+	else if(clipRes == CLIPPED_PARTIAL)
+		lib->profile.clipPartial++;
+#endif
 	if(clipRes == CLIPPED_OUT)
 		return;
 
@@ -577,10 +456,7 @@ void magDrawTriangles(REG(d0, UWORD startVtx), REG(d1, UWORD nVerts), REG(a6, Ma
 
 	TexGenBuffer(vbMem, startVtx, nVerts, lib);
 
-	struct GfxBase *GfxBase = lib->gfxBase;
-	OwnBlitter();
-
-	SetupHW(lib);
+	BeginDrawBatch(lib);
 
 	if(clipRes == CLIPPED_IN)
 	{
@@ -617,7 +493,9 @@ void magDrawTriangles(REG(d0, UWORD startVtx), REG(d1, UWORD nVerts), REG(a6, Ma
 			}
 		}
 	}
-	DisownBlitter();
+#if PROFILE
+	lib->profile.draw += GetClocks() - drawStart;
+#endif
 }
 
 /*****************************************************************************/
@@ -632,6 +510,9 @@ static void DrawSpan(float leftPos, float rightPos, float leftWW, float leftUU, 
 
 void magDrawIndexedTriangles(REG(d0, UWORD startVtx), REG(d1, UWORD nVerts), REG(d2, UWORD startIndx), REG(d3, UWORD nIndx), REG(a6, MaggieBase *lib))
 {
+	if(!CanDraw(lib))
+		return;
+
 	lib->sourceIsPoly = 0;
 #if PROFILE
 	ULONG drawStart = GetClocks();
@@ -640,14 +521,15 @@ void magDrawIndexedTriangles(REG(d0, UWORD startVtx), REG(d1, UWORD nVerts), REG
 	VertexBufferMemory *vbMem = lib->vertexBuffers[lib->vBuffer];
 	TransformVertexPositions(&vbMem->transVerts[startVtx], &vbMem->positions[startVtx], nVerts, lib);
 
-	if(lib->drawMode & MAG_DRAWMODE_LIGHTING)
-	{
-		LightBuffer(vbMem, startVtx, nVerts, lib);
-	}
-
-	TexGenBuffer(vbMem, startVtx, nVerts, lib);
-
 	int clipRes = ComputeClipCodes(&vbMem->clipCodes[startVtx], &vbMem->transVerts[startVtx], nVerts);
+#if PROFILE
+	if(clipRes == CLIPPED_OUT)
+		lib->profile.clipOut++;
+	else if(clipRes == CLIPPED_IN)
+		lib->profile.clipIn++;
+	else if(clipRes == CLIPPED_PARTIAL)
+		lib->profile.clipPartial++;
+#endif
 
 	if(clipRes == CLIPPED_OUT)
 	{
@@ -657,14 +539,24 @@ void magDrawIndexedTriangles(REG(d0, UWORD startVtx), REG(d1, UWORD nVerts), REG
 		return;
 	}
 
-	struct GfxBase *GfxBase = lib->gfxBase;
-	OwnBlitter();
+	// Lighting and texgen run after the clip test so a fully off-screen batch
+	// pays for neither (magDrawTriangles/magDrawIndexedPolygons already did).
+	if(lib->drawMode & MAG_DRAWMODE_LIGHTING)
+	{
+		LightBuffer(vbMem, startVtx, nVerts, lib);
+	}
 
-	SetupHW(lib);
+	TexGenBuffer(vbMem, startVtx, nVerts, lib);
+
+	BeginDrawBatch(lib);
+
+	// Hoisted: DrawTriangle takes lib, so the compiler has to assume the call may
+	// have rewritten vbMem->transVerts and reloads it on every iteration.
+	struct MaggieTransVertex *transVerts = vbMem->transVerts;
 
 	if(clipRes == CLIPPED_IN)
 	{
-		NormaliseClippedVertexBuffer(&vbMem->transVerts[startVtx], nVerts, lib);
+		NormaliseClippedVertexBuffer(&transVerts[startVtx], nVerts, lib);
 		for(int i = 0; i < nIndx; i += 3)
 		{
 			int i0 = indexBuffer[i + 0];
@@ -674,7 +566,7 @@ void magDrawIndexedTriangles(REG(d0, UWORD startVtx), REG(d1, UWORD nVerts), REG
 # if PROFILE
 //			ULONG distStart = GetClocks();
 # endif
-			DrawTriangle(&vbMem->transVerts[i0], &vbMem->transVerts[i1], &vbMem->transVerts[i2], lib);
+			DrawTriangle(&transVerts[i0], &transVerts[i1], &transVerts[i2], lib);
 # if PROFILE
 //			lib->profile.draw += GetClocks() - distStart;
 # endif
@@ -707,9 +599,9 @@ void magDrawIndexedTriangles(REG(d0, UWORD startVtx), REG(d1, UWORD nVerts), REG
 
 			if(!(vbMem->clipCodes[i0] & vbMem->clipCodes[i1] & vbMem->clipCodes[i2]))
 			{
-				clippedPoly[0] = vbMem->transVerts[i0];
-				clippedPoly[1] = vbMem->transVerts[i1];
-				clippedPoly[2] = vbMem->transVerts[i2];
+				clippedPoly[0] = transVerts[i0];
+				clippedPoly[1] = transVerts[i1];
+				clippedPoly[2] = transVerts[i2];
 				if(vbMem->clipCodes[i0] | vbMem->clipCodes[i1] | vbMem->clipCodes[i2])
 				{
 					int nClippedVerts = ClipPolygon(clippedPoly, 3);
@@ -727,9 +619,8 @@ void magDrawIndexedTriangles(REG(d0, UWORD startVtx), REG(d1, UWORD nVerts), REG
 			}
 		}
 	}
-	DisownBlitter();
 #if PROFILE
-//	lib->profile.draw += GetClocks() - drawStart;
+	lib->profile.draw += GetClocks() - drawStart;
 #endif
 }
 
@@ -737,6 +628,9 @@ void magDrawIndexedTriangles(REG(d0, UWORD startVtx), REG(d1, UWORD nVerts), REG
 
 void magDrawIndexedPolygons(REG(d0, UWORD startVtx), REG(d1, UWORD nVerts), REG(d2, UWORD startIndx), REG(d3, UWORD nIndx), REG(a6, MaggieBase *lib))
 {
+	if(!CanDraw(lib))
+		return;
+
 	lib->sourceIsPoly = 1;
 #if PROFILE
 	ULONG drawStart = GetClocks();
@@ -751,6 +645,14 @@ void magDrawIndexedPolygons(REG(d0, UWORD startVtx), REG(d1, UWORD nVerts), REG(
 	TransformVertexPositions(&vbMem->transVerts[startVtx], &vbMem->positions[startVtx], nVerts, lib);
 
 	int clipRes = ComputeClipCodes(&clipCodes[startVtx], &vbMem->transVerts[startVtx], nVerts);
+#if PROFILE
+	if(clipRes == CLIPPED_OUT)
+		lib->profile.clipOut++;
+	else if(clipRes == CLIPPED_IN)
+		lib->profile.clipIn++;
+	else if(clipRes == CLIPPED_PARTIAL)
+		lib->profile.clipPartial++;
+#endif
 
 	if(clipRes == CLIPPED_OUT)
 	{
@@ -765,20 +667,13 @@ void magDrawIndexedPolygons(REG(d0, UWORD startVtx), REG(d1, UWORD nVerts), REG(
 		LightBuffer(vbMem, startVtx, nVerts, lib);
 	}
 
-	if(lib->txtrIndex != 0xffff)
-	{
-		TexGenBuffer(vbMem, startVtx, nVerts, lib);
-	}
+	TexGenBuffer(vbMem, startVtx, nVerts, lib);
 
-	struct GfxBase *GfxBase = lib->gfxBase;
-
-	OwnBlitter();
-
-	SetupHW(lib);
+	BeginDrawBatch(lib);
 
 	if(clipRes == CLIPPED_IN)
 	{
-		NormaliseClippedVertexBuffer(&vbMem->transVerts[startVtx], nVerts, lib);
+		NormaliseClippedVertexBuffer(&transVtx[startVtx], nVerts, lib);
 		int indxPos = 0;
 		while(indxPos < nIndx)
 		{
@@ -792,7 +687,7 @@ void magDrawIndexedPolygons(REG(d0, UWORD startVtx), REG(d1, UWORD nVerts), REG(
 			}
 			if(nPolyVerts >= 3)
 			{
-				DrawIndexedPolygon(vbMem->transVerts, &indexBuffer[indxPos], nPolyVerts, lib);
+				DrawIndexedPolygon(transVtx, &indexBuffer[indxPos], nPolyVerts, lib);
 			}
 			indxPos += nPolyVerts + 1;
 		}
@@ -823,7 +718,7 @@ void magDrawIndexedPolygons(REG(d0, UWORD startVtx), REG(d1, UWORD nVerts), REG(
 			}
 			for(int i = 0; i < nPolyVerts; ++i)
 			{
-				clippedPoly[i] = vbMem->transVerts[indexBuffer[i + indxPos]];
+				clippedPoly[i] = transVtx[indexBuffer[i + indxPos]];
 			}
 			indxPos += nPolyVerts + 1;
 			if(clippedAny)
@@ -842,7 +737,6 @@ void magDrawIndexedPolygons(REG(d0, UWORD startVtx), REG(d1, UWORD nVerts), REG(
 			}
 		}
 	}
-	DisownBlitter();
 #if PROFILE
 	lib->profile.draw += GetClocks() - drawStart;
 #endif
@@ -899,21 +793,31 @@ static void ExpandSpriteBuffer(struct MaggieTransVertex *dest, struct MaggieSpri
 
 void magDrawSprites(REG(d0, UWORD startVtx), REG(d1, UWORD nSprites), REG(fp0, float spriteSize), REG(a6, MaggieBase *lib))
 {
+	if(!CanDraw(lib))
+		return;
+
+#if PROFILE
+	ULONG drawStart = GetClocks();
+#endif
 	lib->sourceIsPoly = 1;			// sprite quads: intensity may be non-planar -> safe per-scanline path
 	VertexBufferMemory *vbMem = lib->vertexBuffers[lib->vBuffer];
 	TransformToSpriteBuffer(spriteBufferUP, &vbMem->positions[startVtx], nSprites, lib);
 	ExpandSpriteBuffer(transVtxBufferUP, spriteBufferUP, nSprites, spriteSize * 0.5f, lib);
 	int clipRes = ComputeClipCodes(transClipCodesUP, transVtxBufferUP, nSprites * 4);
+#if PROFILE
+	if(clipRes == CLIPPED_OUT)
+		lib->profile.clipOut++;
+	else if(clipRes == CLIPPED_IN)
+		lib->profile.clipIn++;
+	else if(clipRes == CLIPPED_PARTIAL)
+		lib->profile.clipPartial++;
+#endif
 
 	if(clipRes == CLIPPED_OUT)
 	{
 		return;
 	}
-	struct GfxBase *GfxBase = lib->gfxBase;
-
-	OwnBlitter();
-
-	SetupHW(lib);
+	BeginDrawBatch(lib);
 
 	if(clipRes == CLIPPED_IN)
 	{
@@ -939,27 +843,39 @@ void magDrawSprites(REG(d0, UWORD startVtx), REG(d1, UWORD nSprites), REG(fp0, f
 			}
 		}
 	}
-	DisownBlitter();
+#if PROFILE
+	lib->profile.draw += GetClocks() - drawStart;
+#endif
 }
 
 /*****************************************************************************/
 
 void magDrawSpritesUP(REG(a0, struct MaggieSpriteVertex *vtx), REG(d0, UWORD nSprites), REG(fp0, float spriteSize), REG(a6, MaggieBase *lib))
 {
+	if(!CanDraw(lib))
+		return;
+
+#if PROFILE
+	ULONG drawStart = GetClocks();
+#endif
 	lib->sourceIsPoly = 0;			// sprite quads: always flat.
 	TransformSpriteBuffer(spriteBufferUP, vtx, nSprites, lib);
 	ExpandSpriteBuffer(transVtxBufferUP, spriteBufferUP, nSprites, spriteSize * 0.5f, lib);
 	int clipRes = ComputeClipCodes(transClipCodesUP, transVtxBufferUP, nSprites * 4);
+#if PROFILE
+	if(clipRes == CLIPPED_OUT)
+		lib->profile.clipOut++;
+	else if(clipRes == CLIPPED_IN)
+		lib->profile.clipIn++;
+	else if(clipRes == CLIPPED_PARTIAL)
+		lib->profile.clipPartial++;
+#endif
 
 	if(clipRes == CLIPPED_OUT)
 	{
 		return;
 	}
-	struct GfxBase *GfxBase = lib->gfxBase;
-
-	OwnBlitter();
-
-	SetupHW(lib);
+	BeginDrawBatch(lib);
 
 	if(clipRes == CLIPPED_IN)
 	{
@@ -985,7 +901,9 @@ void magDrawSpritesUP(REG(a0, struct MaggieSpriteVertex *vtx), REG(d0, UWORD nSp
 			}
 		}
 	}
-	DisownBlitter();
+#if PROFILE
+	lib->profile.draw += GetClocks() - drawStart;
+#endif
 }
 
 /*****************************************************************************/

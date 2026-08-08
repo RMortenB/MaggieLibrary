@@ -94,5 +94,15 @@ GetScissorPtr MACRO
 	lea		456(a6),\1
 ENDM
 GetGradientsPtr MACRO
-	lea		52312(a6),\1
+	lea		MB_gradients(a6),\1
 ENDM
+
+; MaggieBase fields the asm reaches directly. Every one of these is guarded by a
+; _Static_assert in maggie_draw.c - if the struct layout moves, the C build fails
+; rather than the asm silently reading the wrong field. All of them sit ahead of
+; the #if PROFILE block in the struct, so one set of offsets is correct for both
+; the normal and the PROFILE=1 build.
+MB_gradients	EQU	52312
+MB_cullSign	EQU	175594
+MB_primMinY	EQU	175598
+MB_primMaxY	EQU	175602

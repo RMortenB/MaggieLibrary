@@ -36,6 +36,9 @@ VertexBufferMemory *CreateVertexBufferMemory(UWORD nVerts, MaggieBase *lib)
 	vbMem->nVerts = nVerts;
 	vbMem->memSize = memSize;
 
+	memset(vbMem->colours, ~0, sizeof(ULONG) * nVerts);
+
+
 	return vbMem;
 }
 
@@ -313,8 +316,9 @@ void magUploadVertexColours(REG(d0, UWORD vBuffer), REG(a0, ULONG *colours), REG
 
 	for(int i = 0; i < nVerts; ++i)
 	{
-		UWORD gray = ColourTo16Bit(colours[i]);
+		UWORD gray = RGBToGrayScale(colours[i]);
 		mem->colours[startVtx + i] = gray | (gray << 8);
+		mem->transVerts[startVtx + i].colour = gray | (gray << 8);
 	}
 }
 
@@ -347,7 +351,9 @@ void magUploadVertexBuffer(REG(d0, UWORD vBuffer), REG(a0, struct MaggieVertex *
 		vbMem->uvs[startVtx + i].u = vtx[i].tex[0].u * 256.0f * 65536.0f;
 		vbMem->uvs[startVtx + i].v = vtx[i].tex[0].v * 256.0f * 65536.0f;
 		vbMem->uvs[startVtx + i].w = vtx[i].tex[0].w;
-		vbMem->colours[startVtx + i] = RGBToGrayScale(vtx[i].colour) | (RGBToGrayScale(vtx[i].colour) << 8);
+		UWORD gray = RGBToGrayScale(vtx[i].colour);
+		vbMem->colours[startVtx + i] = gray | (gray << 8);
+		vbMem->transVerts[startVtx + i].colour = gray | (gray << 8);
 	}
 	PrepareVertexBuffer(&vbMem->transVerts[startVtx], &vtx[startVtx], nVerts);
 }
@@ -476,7 +482,6 @@ void magBeginScene(REG(a6, MaggieBase *lib))
 	memset(&lib->profile, 0, sizeof(lib->profile));
 	lib->profile.frame = GetClocks();
 #endif
-	lib->frameCounter = lib->drawMode & 0x8000 ? 1 : 0;
 }
 
 /*****************************************************************************/
@@ -488,18 +493,36 @@ void magEndScene(REG(a6, MaggieBase *lib))
 	lib->profile.frame = GetClocks() - lib->profile.frame;
 	if(lib->profile.frame)
 	{
+		// `draw` is the whole magDraw* window, so it already contains `spans`
+		// (and trans/texgen/light). The number worth looking at is the
+		// difference: Spans is what the rasterizer costs, Setup is what the CPU
+		// costs to feed it.
+		ULONG spans = lib->profile.spans;
+		ULONG setup = (lib->profile.draw > spans) ? lib->profile.draw - spans : 0;
+
 		TextOut(lib, "Frame  : %d", lib->profile.frame);
-		TextOut(lib, "Lines  : %d - %d%%", lib->profile.lines, lib->profile.lines * 100 / lib->profile.frame);
-		TextOut(lib, "Spans  : %d - %d%%", lib->profile.spans, lib->profile.spans * 100 / lib->profile.frame);
-		TextOut(lib, "Trans  : %d - %d%%", lib->profile.trans, lib->profile.trans * 100 / lib->profile.frame);
 		TextOut(lib, "Clear  : %d - %d%%", lib->profile.clear, lib->profile.clear * 100 / lib->profile.frame);
-		TextOut(lib, "Light  : %d - %d%%", lib->profile.light, lib->profile.light * 100 / lib->profile.frame);
-		TextOut(lib, "Draw   : %d - %d%%", lib->profile.draw, lib->profile.draw * 100 / lib->profile.frame);
-		TextOut(lib, "TexGen : %d - %d%%", lib->profile.texgen, lib->profile.texgen * 100 / lib->profile.frame);
+		TextOut(lib, "Spans  : %d - %d%%", spans, spans * 100 / lib->profile.frame);
+		TextOut(lib, "Setup  : %d - %d%%", setup, setup * 100 / lib->profile.frame);
+		TextOut(lib, "  Trans : %d - %d%%", lib->profile.trans, lib->profile.trans * 100 / lib->profile.frame);
+		TextOut(lib, "  TexGen: %d - %d%%", lib->profile.texgen, lib->profile.texgen * 100 / lib->profile.frame);
+		TextOut(lib, "  Light : %d - %d%%", lib->profile.light, lib->profile.light * 100 / lib->profile.frame);
+		TextOut(lib, "Draw   : %d - %d%% (Setup+Spans)", lib->profile.draw, lib->profile.draw * 100 / lib->profile.frame);
+		if(lib->profile.prims)
+		{
+			TextOut(lib, "Prims  : %d", lib->profile.prims);
+			TextOut(lib, "per prim: setup %d, spans %d", setup / lib->profile.prims, spans / lib->profile.prims);
+		}
+		TextOut(lib, "ClipOut: %d", lib->profile.clipOut);
+		TextOut(lib, "ClipIn : %d", lib->profile.clipIn);
+		TextOut(lib, "ClipPar: %d", lib->profile.clipPartial);
+#if PROFILE_EDGES
+		// Only meaningful in isolation: the timers that produce these also
+		// inflate Setup above, since DrawEdge nearly doubles in size.
+		TextOut(lib, "Lines  : %d - %d%%", lib->profile.lines, lib->profile.lines * 100 / lib->profile.frame);
 		if(lib->profile.nLinePixels)
 			TextOut(lib, "Line time per pixel %d (%d)", lib->profile.lines / lib->profile.nLinePixels, lib->profile.nLinePixels);
-		if(lib->profile.nPixels)
-			TextOut(lib, "Span time per pixel %d (%d)", lib->profile.spans / lib->profile.nPixels, lib->profile.nPixels);
+#endif
 	}
 #endif
 	ReleaseSemaphore(&lib->lock);

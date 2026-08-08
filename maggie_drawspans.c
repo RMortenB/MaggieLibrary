@@ -76,13 +76,90 @@ void DrawScanlinesNIZ(int ymin __asm("d0"), int ymax __asm("d1"), int pixelSize 
 
 /*****************************************************************************/
 
-void DrawSpans(int miny, int maxy, MaggieBase *lib)
+// Resolve both intensity variants of the span renderer for the current
+// drawMode. Called once per batch from BeginDrawBatch(); the per-primitive path
+// then just picks one of the two pointers instead of walking this branch tree
+// for every triangle.
+
+void SelectScanFunctions(MaggieBase *lib)
 {
-	if(((!lib->hasMaggie) || lib->txtrIndex == 0xffff) || !lib->textures[lib->txtrIndex])
+	UWORD mode = lib->drawMode;
+
+	if(mode & MAG_DRAWMODE_AFFINE_MAPPING)
 	{
-		return;
+		if(mode & MAG_DRAWMODE_DEPTHBUFFER)
+		{
+			if(mode & MAG_DRAWMODE_32BIT)
+			{
+				lib->scanFuncFlat = DrawScanlines32ZAffine;
+				lib->scanFuncPoly = DrawScanlines32ZAffinePoly;
+			}
+			else
+			{
+				lib->scanFuncFlat = DrawScanlines16ZAffine;
+				lib->scanFuncPoly = DrawScanlines16ZAffinePoly;
+			}
+		}
+		else
+		{
+			if(mode & MAG_DRAWMODE_32BIT)
+			{
+				lib->scanFuncFlat = DrawScanlines32Affine;
+				lib->scanFuncPoly = DrawScanlines32AffinePoly;
+			}
+			else
+			{
+				lib->scanFuncFlat = DrawScanlines16Affine;
+				lib->scanFuncPoly = DrawScanlines16AffinePoly;
+			}
+		}
+	}
+	else
+	{
+		if(mode & MAG_DRAWMODE_DEPTHBUFFER)
+		{
+			if(mode & MAG_DRAWMODE_32BIT)
+			{
+				lib->scanFuncFlat = DrawScanlines32IZ;
+				lib->scanFuncPoly = DrawScanlines32IZPoly;
+			}
+			else
+			{
+				lib->scanFuncFlat = DrawScanlines16IZ;
+				lib->scanFuncPoly = DrawScanlines16IZPoly;
+			}
+		}
+		else
+		{
+			if(mode & MAG_DRAWMODE_32BIT)
+			{
+				lib->scanFuncFlat = DrawScanlines32;
+			}
+			else
+			{
+				lib->scanFuncFlat = DrawScanlines16;
+			}
+			// No depth buffer -> no per-scanline intensity variant exists.
+			lib->scanFuncPoly = lib->scanFuncFlat;
+		}
 	}
 
+	lib->scanFunc = lib->scanFuncFlat;
+
+	// Only magDrawIndexedPolygons can produce non-planar intensity; collapsing
+	// the two pointers here saves the source test in the per-primitive path.
+	if(!lib->sourceIsPoly)
+		lib->scanFuncPoly = lib->scanFuncFlat;
+}
+
+/*****************************************************************************/
+
+// The "can this batch draw at all" test (Maggie present, texture bound) used to
+// live here and ran per primitive; BeginDrawBatch() now rejects the whole call
+// up front.
+
+void DrawSpans(int miny, int maxy, MaggieBase *lib)
+{
 	if(miny < lib->scissor.y0)
 		miny = lib->scissor.y0;
 	if(maxy > lib->scissor.y1)
@@ -90,76 +167,10 @@ void DrawSpans(int miny, int maxy, MaggieBase *lib)
 	if(miny >= maxy)
 		return;
 #if PROFILE
+	lib->profile.prims++;
 	ULONG spansStart = GetClocks();
 #endif
-	if(lib->drawMode & MAG_DRAWMODE_AFFINE_MAPPING)
-	{
-		if(lib->drawMode & MAG_DRAWMODE_DEPTHBUFFER)
-		{
-			if(lib->drawMode & MAG_DRAWMODE_32BIT)
-			{
-				if(lib->polyIntensity)
-					DrawScanlines32ZAffinePoly(miny, maxy, lib);
-				else
-					DrawScanlines32ZAffine(miny, maxy, lib);
-			}
-			else
-			{
-				if(lib->polyIntensity)
-					DrawScanlines16ZAffinePoly(miny, maxy, lib);
-				else
-					DrawScanlines16ZAffine(miny, maxy, lib);
-			}
-		}
-		else
-		{
-			if(lib->drawMode & MAG_DRAWMODE_32BIT)
-			{
-				if(lib->polyIntensity)
-					DrawScanlines32AffinePoly(miny, maxy, lib);
-				else
-					DrawScanlines32Affine(miny, maxy, lib);
-			}
-			else
-			{
-				if(lib->polyIntensity)
-					DrawScanlines16AffinePoly(miny, maxy, lib);
-				else
-					DrawScanlines16Affine(miny, maxy, lib);
-			}
-		}
-	}
-	else
-	{
-		if(lib->drawMode & MAG_DRAWMODE_DEPTHBUFFER)
-		{
-			if(lib->drawMode & MAG_DRAWMODE_32BIT)
-			{
-				if(lib->polyIntensity)
-					DrawScanlines32IZPoly(miny, maxy, lib);
-				else
-					DrawScanlines32IZ(miny, maxy, lib);
-			}
-			else
-			{
-				if(lib->polyIntensity)
-					DrawScanlines16IZPoly(miny, maxy, lib);
-				else
-					DrawScanlines16IZ(miny, maxy, lib);
-			}
-		}
-		else
-		{
-			if(lib->drawMode & MAG_DRAWMODE_32BIT)
-			{
-				DrawScanlines32(miny, maxy, lib);
-			}
-			else
-			{
-				DrawScanlines16(miny, maxy, lib);
-			}
-		}
-	}
+	lib->scanFunc(miny, maxy, lib);
 #if PROFILE
 	lib->profile.spans += GetClocks() - spansStart;
 #endif
