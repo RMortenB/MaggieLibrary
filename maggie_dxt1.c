@@ -14,6 +14,14 @@ typedef struct
 
 /*****************************************************************************/
 
+// DXT1 carries one bit of alpha: in a block where col0 <= col1, pixel index 3
+// means transparent. Maggie always honours that - it can't be switched off - so
+// a block holding any transparent texel must be encoded 3-colour, and a 4-colour
+// block must never end up with an index 3. Source alpha below this is transparent.
+#define ALPHA_THRESHOLD 128
+
+/*****************************************************************************/
+
 static UWORD RGBTo16Bit(ULONG rgb)
 {
 	return ((rgb >> 8) & 0xf800) | ((rgb >> 5) & 0x07e0) | ((rgb >> 3) & 0x001f);
@@ -42,7 +50,7 @@ static int Sqr(int a)
 
 /*****************************************************************************/
 
-static float QuantizeBlock3(DXTBlock *block, UBYTE *src, int width, int pixelSize, int rVec, int gVec, int bVec, int rOrigo, int gOrigo, int bOrigo, float ooLenSq)
+static float QuantizeBlock3(DXTBlock *block, UBYTE *src, int width, int pixelSize, int rVec, int gVec, int bVec, int rOrigo, int gOrigo, int bOrigo, float ooLenSq, UWORD transMask)
 {
 	float error = 0.0f;
 
@@ -66,6 +74,13 @@ static float QuantizeBlock3(DXTBlock *block, UBYTE *src, int width, int pixelSiz
 	{
 		for(int j = 0; j < 4; ++j)
 		{
+			if(transMask & (1 << (i * 4 + j)))
+			{
+				// Transparent texel: index 3, and it carries no colour error.
+				block->pixels |= 3u << (((i) * 4 + j) * 2);
+				continue;
+			}
+
 			int r = src[(i * width + j) * pixelSize + 0];
 			int g = src[(i * width + j) * pixelSize + 1];
 			int b = src[(i * width + j) * pixelSize + 2];
@@ -158,13 +173,22 @@ void CompressRGB(UBYTE *dst, UBYTE *src, int width, int height, int pixelSize, i
 			int bMax = 0;
 			int gMax = 0;
 			int rMax = 0;
+			UWORD transMask = 0;
 			for(int i = 0; i < 4; ++i)
 			{
 				for(int j = 0; j < 4; ++j)
 				{
-					int r = src[((y + i) * width + x + j) * pixelSize + 0];
-					int g = src[((y + i) * width + x + j) * pixelSize + 1];
-					int b = src[((y + i) * width + x + j) * pixelSize + 2];
+					UBYTE *pixel = &src[((y + i) * width + x + j) * pixelSize];
+					if((pixelSize == 4) && (pixel[3] < ALPHA_THRESHOLD))
+					{
+						// A transparent texel has no colour to reproduce - keep it out
+						// of the fit so its RGB (usually black) can't drag the endpoints.
+						transMask |= 1 << (i * 4 + j);
+						continue;
+					}
+					int r = pixel[0];
+					int g = pixel[1];
+					int b = pixel[2];
 					rMin = MinVal(rMin, r);
 					gMin = MinVal(gMin, g);
 					bMin = MinVal(bMin, b);
@@ -183,7 +207,64 @@ void CompressRGB(UBYTE *dst, UBYTE *src, int width, int height, int pixelSize, i
 			block->col1 = RGBTo16Bit((rMin << 16) | (gMin << 8) | bMin);
 			block->pixels = 0;
 			int blk4 = 1;
-			if(block->col0 != block->col1)
+			if(transMask == 0xffff)
+			{
+				// Nothing opaque left to fit - a flat transparent block.
+				block->col0 = 0;
+				block->col1 = 0;
+				block->pixels = 0xffffffff;
+				blk4 = 0;
+			}
+			else if(transMask)
+			{
+				// Mixed block: the transparent texels need index 3, so this one has to
+				// be 3-colour whatever it costs - QuantizeBlock4 must not see it, and
+				// neither must the 4-colour endpoint swap (it would turn 3 into 2).
+				blk4 = 0;
+				if(block->col0 != block->col1)
+				{
+					float ooLenSq = 1.0f / lenSq;
+					float lowestError = QuantizeBlock3(block, &src[(y * width + x) * pixelSize], width, pixelSize, rVec, gVec, bVec, rMin, gMin, bMin, ooLenSq, transMask);
+					if(quality)
+					{
+						// Same alternate diagonals of the colour bounding box as the
+						// opaque path below, 3-colour only.
+						static const int gSign[3] = { 1, -1, -1 };
+						static const int bSign[3] = { -1, 1, -1 };
+						for(int c = 0; c < 3; ++c)
+						{
+							int gLow = (gSign[c] > 0) ? gMin : gMax;
+							int bLow = (bSign[c] > 0) ? bMin : bMax;
+							int gHigh = (gSign[c] > 0) ? gMax : gMin;
+							int bHigh = (bSign[c] > 0) ? bMax : bMin;
+
+							DXTBlock testBlk;
+							testBlk.col0 = RGBTo16Bit((rMax << 16) | (gHigh << 8) | bHigh);
+							testBlk.col1 = RGBTo16Bit((rMin << 16) | (gLow << 8) | bLow);
+							testBlk.pixels = 0;
+							float error = QuantizeBlock3(&testBlk, &src[(y * width + x) * pixelSize], width, pixelSize, rVec, gSign[c] * gVec, bSign[c] * bVec, rMin, gLow, bLow, ooLenSq, transMask);
+							if(lowestError > error)
+							{
+								lowestError = error;
+								*block = testBlk;
+							}
+						}
+					}
+				}
+				else
+				{
+					// Every opaque texel is the same colour, so index 0 is already exact
+					// for them and only the transparent ones need their index set.
+					for(int i = 0; i < 16; ++i)
+					{
+						if(transMask & (1 << i))
+						{
+							block->pixels |= 3u << (i * 2);
+						}
+					}
+				}
+			}
+			else if(block->col0 != block->col1)
 			{
 				float lowestError;
 				float ooLenSq = 1.0f / lenSq;
@@ -196,7 +277,7 @@ void CompressRGB(UBYTE *dst, UBYTE *src, int width, int height, int pixelSize, i
 					testBlk.col0 = RGBTo16Bit((rMax << 16) | (gMax << 8) | bMax);
 					testBlk.col1 = RGBTo16Bit((rMin << 16) | (gMin << 8) | bMin);
 					testBlk.pixels = 0;
-					error = QuantizeBlock3(&testBlk, &src[(y * width + x) * pixelSize], width, pixelSize, rVec, gVec, bVec, rMin, gMin, bMin, ooLenSq);
+					error = QuantizeBlock3(&testBlk, &src[(y * width + x) * pixelSize], width, pixelSize, rVec, gVec, bVec, rMin, gMin, bMin, ooLenSq, 0);
 					if(lowestError > error)
 					{
 						lowestError = error;
@@ -213,7 +294,7 @@ void CompressRGB(UBYTE *dst, UBYTE *src, int width, int height, int pixelSize, i
 						*block = testBlk;
 						blk4 = 1;
 					}
-					error = QuantizeBlock3(&testBlk, &src[(y * width + x) * pixelSize], width, pixelSize, rVec, gVec, -bVec, rMin, gMin, bMax, ooLenSq);
+					error = QuantizeBlock3(&testBlk, &src[(y * width + x) * pixelSize], width, pixelSize, rVec, gVec, -bVec, rMin, gMin, bMax, ooLenSq, 0);
 					if(lowestError > error)
 					{
 						lowestError = error;
@@ -230,7 +311,7 @@ void CompressRGB(UBYTE *dst, UBYTE *src, int width, int height, int pixelSize, i
 						*block = testBlk;
 						blk4 = 1;
 					}
-					error = QuantizeBlock3(&testBlk, &src[(y * width + x) * pixelSize], width, pixelSize, rVec, -gVec, bVec, rMin, gMax, bMin, ooLenSq);
+					error = QuantizeBlock3(&testBlk, &src[(y * width + x) * pixelSize], width, pixelSize, rVec, -gVec, bVec, rMin, gMax, bMin, ooLenSq, 0);
 					if(lowestError > error)
 					{
 						lowestError = error;
@@ -247,7 +328,7 @@ void CompressRGB(UBYTE *dst, UBYTE *src, int width, int height, int pixelSize, i
 						*block = testBlk;
 						blk4 = 1;
 					}
-					error = QuantizeBlock3(&testBlk, &src[(y * width + x) * pixelSize], width, pixelSize, rVec, -gVec, -bVec, rMin, gMax, bMax, ooLenSq);
+					error = QuantizeBlock3(&testBlk, &src[(y * width + x) * pixelSize], width, pixelSize, rVec, -gVec, -bVec, rMin, gMax, bMax, ooLenSq, 0);
 					if(lowestError > error)
 					{
 						lowestError = error;
@@ -255,25 +336,29 @@ void CompressRGB(UBYTE *dst, UBYTE *src, int width, int height, int pixelSize, i
 						blk4 = 0;
 					}
 				}
-				if(blk4)
+			}
+			// Put the endpoints the way round the decoder expects for the mode this
+			// block ended up in: col0 > col1 is 4-colour, col0 <= col1 is 3-colour.
+			// The 3-colour index remap leaves index 3 alone, so swapping can't
+			// disturb the transparent texels.
+			if(blk4)
+			{
+				if(block->col0 < block->col1)
 				{
-					if(block->col0 < block->col1)
-					{
-						UWORD tmp = block->col0;
-						block->col0 = block->col1;
-						block->col1 = tmp;
-						block->pixels ^= 0x55555555;
-					}
+					UWORD tmp = block->col0;
+					block->col0 = block->col1;
+					block->col1 = tmp;
+					block->pixels ^= 0x55555555;
 				}
-				else
+			}
+			else
+			{
+				if(block->col0 > block->col1)
 				{
-					if(block->col0 > block->col1)
-					{
-						UWORD tmp = block->col0;
-						block->col0 = block->col1;
-						block->col1 = tmp;
-						block->pixels = ((~(block->pixels >> 1)) & 0x55555555) ^ block->pixels;
-					}
+					UWORD tmp = block->col0;
+					block->col0 = block->col1;
+					block->col1 = tmp;
+					block->pixels = ((~(block->pixels >> 1)) & 0x55555555) ^ block->pixels;
 				}
 			}
 			block->pixels = BSwap32(block->pixels);
