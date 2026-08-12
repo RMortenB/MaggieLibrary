@@ -645,6 +645,8 @@ Upload texture data.
   - The input format can be `MAG_TEXFMT_DXT1`, `MAG_TEXFMT_RGB`, or `MAG_TEXFMT_RGBA`.
   - The format used for texture data is always `MAG_TEXFMT_DXT1`.
     - When compressing the data, you can specify `MAG_TEXCOMP_HQ` to get a somewhat better quality against longer compression time.
+  - `MAG_TEXFMT_RGBA` input is compressed to the 1 bit of alpha that DXT1 carries: a texel with an alpha below 128 becomes transparent, and Maggie leaves those pixels untouched when rasterizing. Alpha is never blended - it is either fully on or fully off.
+    - The colour of a transparent texel is discarded, so it does not have to be a sensible colour, but the rest of the block still has to fit three colours instead of four. Keep a texture opaque if you do not need the cutout.
 
 It's the same as for the size parameter for the `magAllocateTexture` function.
 
