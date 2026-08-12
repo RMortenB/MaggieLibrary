@@ -191,14 +191,27 @@ _MaggieSetupTri:
 ; up front would save five multiplies but costs up to 0.4% relative error on
 ; sliver triangles, where the subtraction cancels heavily.
 
-	fcmp.s	#-1e-6,fp0
-
-	fmul	e7,e16			; * dy2 - independent of FPCC and of the fdiv, so
-	fmul	e7,e18			; this stage covers the compare's latency and then
-	fmul	e7,e20			; the division's
+; The * dy2 stage MUST stay ahead of the compare. FP arithmetic sets the FPCC
+; from its result, so scheduling these between the fcmp and the fbgt - which is
+; what they used to do, to cover the compare's latency - made the branch test the
+; sign of (i0-i1)*dy2 instead of the area. Ordinary triangles then took
+; .degenerate, e15 became 0, all five gradients became 0, and the span renderer
+; produced uDelta = vDelta = 0: one texel smeared across the span.
+;
+; Nothing may be placed between the fcmp and the fbgt unless it leaves the FPCC
+; alone (integer instructions are fine - that is why the cull's ftst/fbgt pair
+; above still works with the y-span block inside it).
+	fmul	e7,e16			; * dy2
+	fmul	e7,e18
+	fmul	e7,e20
 	fmul	e7,e22
 	fmul	e7,e4
 
+; The epsilon MUST be written as a hex bit pattern. vasm mis-assembles decimal
+; float immediates without a diagnostic - "#-1e-6" emits -0.0, which would make
+; this "fp0 > 0", always false after the cull, silently removing the guard and
+; letting the fdiv divide by a zero denom.
+	fcmp.s	#$B58637BD,fp0		; -1e-6
 	fbgt	.degenerate
 	fdiv	e8,e15			; -1.0 / denom
 	bra.s	.scaled

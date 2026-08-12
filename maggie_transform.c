@@ -169,22 +169,6 @@ void TransformToSpriteBuffer(struct MaggieSpriteVertex * restrict dstVtx, vec3 *
 
 /*****************************************************************************/
 
-void PrepareVertexBuffer(struct MaggieTransVertex * restrict transDst, struct MaggieVertex * restrict vtx, UWORD nVerts)
-{
-	for(UWORD i = 0; i < nVerts; ++i)
-	{
-		for(UWORD j = 0; j < MAGGIE_MAX_TEXCOORDS; ++j)
-		{
-			vtx[i].tex[j].u = vtx[i].tex[j].u * 256.0f * 65536.0f;
-			vtx[i].tex[j].v = vtx[i].tex[j].v * 256.0f * 65536.0f;
-			transDst[i].tex[j].u = vtx[i].tex[j].u;
-			transDst[i].tex[j].v = vtx[i].tex[j].v;
-			transDst[i].tex[j].w = vtx[i].tex[j].w;
-		}
-		ULONG gray = RGBToGrayScale(vtx[i].colour);
-		transDst[i].colour = vtx[i].colour = gray + (gray << 8);
-	}
-}
 
 /*****************************************************************************/
 

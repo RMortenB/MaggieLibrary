@@ -500,7 +500,6 @@ void SwizzleDXT1Texture(APTR data, int xres, int yres);
 
 /*****************************************************************************/
 
-void PrepareVertexBuffer(struct MaggieTransVertex *transDst, struct MaggieVertex *vtx, UWORD nVerts);
 void TransformVertexPositions(struct MaggieTransVertex * restrict dstVtx, vec3 * restrict vtx, UWORD nVerts, MaggieBase *lib);
 void TexGenBuffer(VertexBufferMemory *src, int startIndex, int nVerts, MaggieBase *lib);
 

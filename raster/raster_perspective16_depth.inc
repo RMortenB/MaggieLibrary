@@ -41,7 +41,7 @@
 	sub.l	d3,d4					;len = x1 - x0
 	ble		.noPixels
 
-	fadd	d3,e4,e2				; xStart + 1
+	fadd.l	d3,e4,e2				; xStart + 1
 
 	lea		(a3,d3.l*.bpp),a1			;dstColPtr = pixels + xStart
 	move.l	a1,Maggie_pixDest(a0)
@@ -109,7 +109,7 @@
 	fmove.l	e5,Maggie_uCoord(a0)
 	fmove.l	e6,Maggie_vCoord(a0)
 
-	cmp.l	#24,d4
+	cmp.l	#16,d4
 	blt.s	.singlePixels
 
 	fmul.l	d6,e15,e7 ; wDDAFullRun
@@ -146,7 +146,7 @@
 	tst.l	d4
 	beq.s	.noPixels
 
-	fdiv	d4,e4,e7
+	fdiv.l	d4,e4,e7
 
 	fmul.l	d4,e15
 	fmul.l	d4,e18

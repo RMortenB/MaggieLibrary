@@ -299,7 +299,9 @@ _MaggieSetupPoly:
 	ftst	fp0
 	fbge	.skip			; backfacing
 
-	fcmp.s	#-1e-6,fp0
+; Hex bit pattern, not a decimal literal: vasm silently assembles "#-1e-6" as
+; -0.0, which would make the fbgt below always false and kill the guard.
+	fcmp.s	#$B58637BD,fp0		; -1e-6
 	fbgt	.degenerate
 	fdiv	e7,e13			; 1.0 / denom
 	bra.s	.scale

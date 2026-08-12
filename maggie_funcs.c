@@ -354,8 +354,14 @@ void magUploadVertexBuffer(REG(d0, UWORD vBuffer), REG(a0, struct MaggieVertex *
 		UWORD gray = RGBToGrayScale(vtx[i].colour);
 		vbMem->colours[startVtx + i] = gray | (gray << 8);
 		vbMem->transVerts[startVtx + i].colour = gray | (gray << 8);
+
+		for(UWORD j = 0; j < MAGGIE_MAX_TEXCOORDS; ++j)
+		{
+			vbMem->transVerts[startVtx + i].tex[j].u = vtx[i].tex[j].u * 256.0f * 65536.0f;
+			vbMem->transVerts[startVtx + i].tex[j].v = vtx[i].tex[j].v * 256.0f * 65536.0f;
+			vbMem->transVerts[startVtx + i].tex[j].w = vtx[i].tex[j].w;
+		}
 	}
-	PrepareVertexBuffer(&vbMem->transVerts[startVtx], &vtx[startVtx], nVerts);
 }
 
 /*****************************************************************************/
