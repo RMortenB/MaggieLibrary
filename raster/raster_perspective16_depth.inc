@@ -19,8 +19,8 @@
 	fmove.w	#1,e4
 	lea		$dff250,a0
 .vLoop:
-	fmove.s	EPos_xPosLeft(a2),e0	;xLeft
-	fmove.s	EPos_xPosRight(a2),e1	;xRight
+	fmove.s	(a2)+,e0				;xLeft  (0)
+	fmove.s	(a2)+,e1				;xRight (4)
 
 	fmove.l	e0,d3					;xStart = (int)xLeft;
 	fmove.l	e1,d4					;xEnd = (int)xRight;
@@ -55,30 +55,37 @@
 	fmove.s	Grad_uowDDA(a1),e18		; uDDA
 	fmove.s	Grad_vowDDA(a1),e21		; vDDA
 
-	; Ascending row order, which is the order the walker laid them down: this
-	; variant reads the whole 32-byte row, forward, so the prefetch follows. The
-	; cost is that zLeft - which feeds the longest dependency chain here, through
-	; the fadd/fsub/fmove.l into Maggie_depthStart - now loads fourth rather than
-	; first. Move it back ahead of iLeft if that ever shows up in a profile.
-	fmove.s	EPos_iLeft(a2),e12		; iLeft   (8)
-	fmove.s	EPos_uLeft(a2),e17		; uowLeft (12)
-	fmove.s	EPos_vLeft(a2),e20		; vowLeft (16)
-	fmove.s	EPos_zLeft(a2),e10		; zLeft   (20)
-	fmove.s	EPos_oowLeft(a2),e14	; oowLeft (24)
+	; The row, walked forward with post-increment - no displacements, and a2 is
+	; left on the next row so the tail needs no modulo add. This variant consumes
+	; the row in layout order with no gaps, which is what makes (a2)+ possible.
+	;
+	; The cost is that zLeft - which feeds the longest dependency chain here,
+	; through the fadd/fsub/fmove.l into Maggie_depthStart - now loads fourth
+	; rather than first, and that the loads can no longer be reordered for
+	; scheduling without breaking the address chain. Both are layout-locked now:
+	; a load order change means a layout change (and the walker, and the asserts).
+	fmove.s	(a2)+,e12				; iLeft   (8)
+	fmove.s	(a2)+,e17				; uowLeft (12)
+	fmove.s	(a2)+,e20				; vowLeft (16)
+	fmove.s	(a2)+,e10				; zLeft   (20)
+	fmove.s	(a2)+,e14				; oowLeft (24)
 
 	fsub	e0,e2,e2				; preStep = 1 + xStart - xPosLeft
 
 	ifne	.polyIntensity
 	; polygon path: intensity is non-planar across >3 verts - interpolate
-	; per-scanline (edge to edge), which needs the reciprocal.
+	; per-scanline (edge to edge), which needs the reciprocal. iRight is the last
+	; word of the row, so this load leaves a2 exactly on the next row.
 	fsub	e0,e1,e3				; xDiff = xRight - xLeft
 	fdiv	e3,e4,e3				; ooXLength = 1.0f / xDiff
-	fmove.s	EPos_iRight(a2),e13		; iowRight
+	fmove.s	(a2)+,e13				; iowRight (28)
 	fsub	e12,e13					; iDiff = iowRight - iowLeft
 	fmul	e3,e13					; iDDA = iDiff * ooXLength
 	else
-	; triangle path: intensity is planar, take it from the fan-sum gradient.
+	; triangle path: intensity is planar, take it from the fan-sum gradient. iRight
+	; goes unread, so close the row by hand.
 	fmove.s	Grad_iDDA(a1),e13		; iDDA
+	addq.l	#4,a2					; skip iRight (28)
 	endc
 
 	fmul	e2,e11,e7				; preStepZ = preStep * zDDA
@@ -149,7 +156,7 @@
 	bge.s		.loopSpan16
 .singlePixels:
 	tst.l	d4
-	beq.s	.noPixels
+	beq.s	.rowDone
 
 	fdiv.l	d4,e4,e7
 
@@ -177,13 +184,33 @@
 	fmove.l	e11,Maggie_vDelta(a0)
 	move.w	d4,Maggie_startLength(a0)
 
-.noPixels:
+	; Drawn-row tail. a2 already sits on the next row - the post-increment walk
+	; consumed the whole 32 bytes - so there is no modulo add here.
+	;
+	; The tail is duplicated rather than shared with .noPixels because the two
+	; paths owe a2 different amounts: sharing one tail would need a branch around
+	; the fixup on every scanline, which costs more than the add it saves.
+	; .singlePixels also lands here when the span ended on a chunk boundary - it
+	; has already walked the row, so it must not take the .noPixels fixup.
+.rowDone:
 	lea		(a3,d2.l*.bpp),a3			;pixels += modulo
 	lea		(a4,d2.l*2),a4			;pixels += modulo
-	lea		EPos_Size(a2),a2
 
 	subq.l	#1,d5 ; ylen
-	bne.w		.vLoop
+	bne.w	.vLoop
+
+	movem.l	(a7)+,d2-d6/a2-a6
+	rts
+
+	; Empty-span tail: only xPosLeft/xPosRight were consumed, so 24 bytes of the
+	; row are still ahead of a2.
+.noPixels:
+	lea		24(a2),a2
+	lea		(a3,d2.l*.bpp),a3			;pixels += modulo
+	lea		(a4,d2.l*2),a4			;pixels += modulo
+
+	subq.l	#1,d5 ; ylen
+	bne.w	.vLoop
 
 	movem.l	(a7)+,d2-d6/a2-a6
 .allDone:

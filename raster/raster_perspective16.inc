@@ -16,8 +16,8 @@
 	fmove.w	#1,e4
 	lea		$dff250,a0
 .vLoop:
-	fmove.s	EPos_xPosLeft(a2),e0	;xLeft
-	fmove.s	EPos_xPosRight(a2),e1	;xRight
+	fmove.s	(a2)+,e0				;xLeft  (0)
+	fmove.s	(a2)+,e1				;xRight (4)
 
 	fmove.l	e0,d3					;xStart = (int)xLeft;
 	fmove.l	e1,d4					;xEnd = (int)xRight;
@@ -54,13 +54,14 @@
 	fmove.s	Grad_uowDDA(a1),e18		; uDDA
 	fmove.s	Grad_vowDDA(a1),e21		; vDDA
 
-	; Ascending row order, which is the order the walker laid them down: the row
-	; is read forward and the prefetch follows. oowLeft is last because z, the
-	; field between v and oow, belongs to the depth variants only.
-	fmove.s	EPos_iLeft(a2),e12		; iLeft   (8)
-	fmove.s	EPos_uLeft(a2),e17		; uowLeft (12)
-	fmove.s	EPos_vLeft(a2),e20		; vowLeft (16)
-	fmove.s	EPos_oowLeft(a2),e14	; oowLeft (24)
+	; The row, walked forward with post-increment. This variant has one gap - it
+	; skips zLeft (20), which belongs to the depth variants - so oowLeft is reached
+	; by displacement off the post-gap position rather than by paying an extra add
+	; to step over z. That leaves a2 at 20, and the tail closes the row.
+	fmove.s	(a2)+,e12				; iLeft   (8)
+	fmove.s	(a2)+,e17				; uowLeft (12)
+	fmove.s	(a2)+,e20				; vowLeft (16)
+	fmove.s	4(a2),e14				; oowLeft (24), a2 is at zLeft (20)
 
 	fsub	e0,e2,e2				; preStep = 1 + xStart - edges[i].xPosLeft
 
@@ -69,7 +70,7 @@
 	; per-scanline (edge to edge), which needs the reciprocal.
 	fsub	e0,e1,e3				; xDiff = xRight - xLeft
 	fdiv	e3,e4,e3				; ooXLength = 1.0f / xDiff
-	fmove.s	EPos_iRight(a2),e13		; iowRight
+	fmove.s	8(a2),e13				; iowRight (28), a2 is at zLeft (20)
 	fsub	e12,e13					; iDiff = iowRight - iowLeft
 	fmul	e3,e13					; iDDA = iDiff * ooXLength
 	else
@@ -135,7 +136,7 @@
 	bge.s	.loopSpan16
 .singlePixels:
 	tst.l	d4
-	beq.s	.noPixels
+	beq.s	.rowDone
 
 	fmul.l	d4,e15
 	fmul.l	d4,e18
@@ -162,9 +163,28 @@
 	fmove.l	e10,Maggie_uDelta(a0)
 	fmove.l	e11,Maggie_vDelta(a0)
 	move.w	d4,Maggie_startLength(a0)
-.noPixels:
+
+	; Drawn-row tail. The post-increment walk stopped at zLeft (20), the field this
+	; variant skips, so 12 bytes of the row are still ahead of a2. .singlePixels
+	; lands here too when the span ended on a chunk boundary.
+	;
+	; The tail is duplicated rather than shared with .noPixels because the two
+	; paths owe a2 different amounts: sharing one tail would need a branch around
+	; the fixup on every scanline, which costs more than the add it saves.
+.rowDone:
+	lea		12(a2),a2					; zLeft (20) -> next row
 	lea		(a3,d2.l*.bpp),a3			;pixels += modulo
-	lea		EPos_Size(a2),a2
+
+	subq.l	#1,d7 ; ylen
+	bne		.vLoop
+
+	movem.l	(a7)+,d2-d7/a2-a4
+	rts
+
+	; Empty-span tail: only xPosLeft/xPosRight were consumed.
+.noPixels:
+	lea		24(a2),a2
+	lea		(a3,d2.l*.bpp),a3			;pixels += modulo
 
 	subq.l	#1,d7 ; ylen
 	bne		.vLoop

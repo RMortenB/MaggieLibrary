@@ -42,8 +42,8 @@
 
 	lea		(a3,d0.l*.bpp),a3		; pixels
 .vLoop:
-	fmove.s	EPos_xPosLeft(a2),e0	; xLeft
-	fmove.s	EPos_xPosRight(a2),e1; xRight
+	fmove.s	(a2)+,e0				; xLeft  (0)
+	fmove.s	(a2)+,e1				; xRight (4)
 
 	fmove.l	e0,d0					; xStart = (int)xLeft;
 	fmove.l	e1,d1					; xEnd = (int)xRight;
@@ -68,9 +68,12 @@
 	move.l	a1,Maggie_pixDest(a0)
 
 	fsub	e0,e2,e2				; preStep = 1 + xStart - edges[i].xPosLeft
-	fmove.s	EPos_iLeft(a2),e12	; iLeft
-	fmove.s	EPos_uLeft(a2),e17	; uowLeft
-	fmove.s	EPos_vLeft(a2),e20	; vowLeft
+	; The row, walked forward with post-increment. This variant stops at vLeft:
+	; z (20), oow (24) and iRight (28) belong to the other variants, and iRight
+	; is read once from the middle scanline in the prologue, not here.
+	fmove.s	(a2)+,e12				; iLeft  (8)
+	fmove.s	(a2)+,e17				; uLeft  (12)
+	fmove.s	(a2)+,e20				; vLeft  (16)
 	fmul	e2,e13,e8				; preStepI = preStep * iDDA
 	fmul	e2,e18,e19				; preStepU = preStep * uDDA
 	fmul	e2,e21,e22				; preStepV = preStep * vDDA
@@ -84,9 +87,23 @@
 	fmove.l	e20,Maggie_vCoord(a0)
 	move.w	d0,Maggie_light(a0)
 	move.w	d1,Maggie_startLength(a0)
-.noPixels:
+
+	; Drawn-row tail: the walk stopped at zLeft (20), so 12 bytes remain. The tail
+	; is duplicated rather than shared with .noPixels because the two paths owe a2
+	; different amounts, and sharing would cost a branch on every scanline.
+	lea		12(a2),a2				; zLeft (20) -> next row
 	lea		(a3,d2.l*.bpp),a3		; pixels += modulo
-	lea		EPos_Size(a2),a2
+
+	subq.l	#1,d4 ; ylen
+	bne		.vLoop
+
+	movem.l	(a7)+,d2-d5/a2-a4
+	rts
+
+	; Empty-span tail: only xPosLeft/xPosRight were consumed.
+.noPixels:
+	lea		24(a2),a2
+	lea		(a3,d2.l*.bpp),a3		; pixels += modulo
 
 	subq.l	#1,d4 ; ylen
 	bne		.vLoop

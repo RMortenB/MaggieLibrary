@@ -46,8 +46,8 @@
 	lea		(a3,d0.l*.bpp),a3		; pixels
 	lea		(a4,d0.l*2),a4			; zbuffer
 .vLoop:
-	fmove.s	EPos_xPosLeft(a2),e0	; xLeft
-	fmove.s	EPos_xPosRight(a2),e1; xRight
+	fmove.s	(a2)+,e0				; xLeft  (0)
+	fmove.s	(a2)+,e1				; xRight (4)
 
 	fmove.l	e0,d3					; xStart = (int)xLeft;
 	fmove.l	e1,d4					; xEnd = (int)xRight;
@@ -73,11 +73,14 @@
 	move.l	a1,Maggie_depthDest(a0)
 
 	fsub	e0,e2,e2				; preStep = 1 + xStart - edges[i].xPosLeft
-	; Ascending row order: this variant reads offsets 0..20, a contiguous prefix.
-	fmove.s	EPos_iLeft(a2),e12	; iLeft (8)
-	fmove.s	EPos_uLeft(a2),e17	; uLeft (12)
-	fmove.s	EPos_vLeft(a2),e20	; vLeft (16)
-	fmove.s	EPos_zLeft(a2),e10	; zLeft (20)
+	; The row, walked forward with post-increment: this variant reads offsets 0..20,
+	; a contiguous prefix, so no displacement and no gap to step over. oow (24) and
+	; iRight (28) belong to the other variants; iRight is read once from the middle
+	; scanline in the prologue, not here.
+	fmove.s	(a2)+,e12				; iLeft (8)
+	fmove.s	(a2)+,e17				; uLeft (12)
+	fmove.s	(a2)+,e20				; vLeft (16)
+	fmove.s	(a2)+,e10				; zLeft (20)
 	fmul	e2,e11,e7				; preStepZ = preStep * zDDA
 	fmul	e2,e13,e8				; preStepI = preStep * iDDA
 	fmul	e2,e18,e19				; preStepU = preStep * uDDA
@@ -99,10 +102,26 @@
 	move.w	d1,Maggie_light(a0)
 	move.l	d0,Maggie_depthStart(a0)
 	move.w	d4,Maggie_startLength(a0)
-.noPixels:
+
+	; Drawn-row tail: the walk stopped after zLeft, so 8 bytes remain - an addq,
+	; not a lea. The tail is duplicated rather than shared with .noPixels because
+	; the two paths owe a2 different amounts, and sharing would cost a branch on
+	; every scanline.
+	addq.l	#8,a2					; oowLeft (24) + iRight (28)
 	lea		(a3,d2.l*.bpp),a3			;pixels += modulo
 	lea		(a4,d2.l*2),a4			;zbuffer += modulo
-	lea		EPos_Size(a2),a2
+
+	subq.l	#1,d5 ; ylen
+	bne		.vLoop
+
+	movem.l	(a7)+,d2-d5/a2-a5
+	rts
+
+	; Empty-span tail: only xPosLeft/xPosRight were consumed.
+.noPixels:
+	lea		24(a2),a2
+	lea		(a3,d2.l*.bpp),a3			;pixels += modulo
+	lea		(a4,d2.l*2),a4			;zbuffer += modulo
 
 	subq.l	#1,d5 ; ylen
 	bne		.vLoop
