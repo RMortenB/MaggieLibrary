@@ -54,37 +54,30 @@
 
 /*****************************************************************************/
 
-typedef struct
-{
-	float xPosLeft;
-	float xPosRight;
-	float zowLeft;
-	float zowRight;
-	float iowLeft;
-	float iowRight;
-	float oowLeft;
-	float oowRight;
-	float uowLeft;
-	float uowRight;
-	float vowLeft;
-	float vowRight;
-} magEdgePos;
-
-/*****************************************************************************/
+// One scanline of the edge table. One fixed 32-byte layout for every draw mode -
+// affine and perspective share it, the affine modes simply never touch oowLeft.
+//
+// Field order is the order the span renderers read them, so a scanline is a
+// forward walk of the row and the optional fields (z, oow, iRight) sit at the
+// tail. Mirrored by STRUCTURE EPos in raster/raster_structs.i, which the asm
+// uses and a _Static_assert in maggie_draw.c pins to this layout.
+//
+// Only the two right-hand values the span code consumes exist: xPosRight for
+// the span end, and iRight for the non-planar intensity of a >3-vertex polygon.
+// The right column used to carry z/u/v/oow as well, written by every edge and
+// read by nothing.
 
 typedef struct
 {
 	float xPosLeft;
 	float xPosRight;
-	float zowLeft;
-	float zowRight;
-	float iowLeft;
-	float iowRight;
-	float uLeft;
-	float uRight;
+	float iLeft;
+	float uLeft;			// u, or u/w in the perspective modes
 	float vLeft;
-	float vRight;
-} magEdgePosAffine;
+	float zLeft;			// MAG_DRAWMODE_DEPTHBUFFER only
+	float oowLeft;			// perspective only
+	float iRight;			// the …Poly span renderers only
+} magEdgePos;
 
 /*****************************************************************************/
 
@@ -229,15 +222,11 @@ struct MaggieBase
 	/*******************/
 
 	ScissorRect scissor;
-	union
-	{
-		magEdgePos magEdge[MAGGIE_MAX_YRES];
-		magEdgePosAffine magEdgeAffine[MAGGIE_MAX_YRES];
-	};
+	magEdgePos magEdge[MAGGIE_MAX_YRES];
 
 	// Per-polygon fan-sum gradients: written by ComputeGradients, read by the
-	// perspective+depth rasterizer via GetGradientsPtr. Placed right after the
-	// magEdge union so the hardcoded asm offsets (xres/screen/depth/scissor/edges
+	// perspective+depth rasterizer via GetGradientsPtr. Placed right after
+	// magEdge so the hardcoded asm offsets (xres/screen/depth/scissor/edges
 	// = 100/104/108/456/472) stay put. Its own offset is guarded by a
 	// _Static_assert in maggie_draw.c against GetGradientsPtr in raster_structs.i.
 	magGradients gradients;
@@ -323,10 +312,13 @@ struct MaggieBase
 	// These live at the end of the struct on purpose: the asm rasterizers
 	// hardcode MaggieBase offsets up to and including gradients (52312), so
 	// nothing may be inserted ahead of it.
-	magDrawLineFunc drawLineFunc;	// DrawLineAsm / DrawLineAffineAsm
-	UBYTE *edgeBaseDown;			// magEdge column written when vtx0.y <= vtx1.y
-	UBYTE *edgeBaseUp;				// magEdge column written when vtx0.y >  vtx1.y
-	int edgeStride;					// sizeof(magEdgePos[Affine])
+	// Edge walkers for the two column sides. Which side a given edge feeds still
+	// depends on its direction (see DrawEdge), but the side now picks a *routine*
+	// rather than a base pointer +4 into an interleaved row: the left walker
+	// writes the left column's attributes, the right one writes only xPosRight
+	// (plus iRight for a polygon source). Both start at magEdge itself.
+	magDrawLineFunc edgeFuncDown;	// used when vtx0.y <= vtx1.y
+	magDrawLineFunc edgeFuncUp;		// used when vtx0.y >  vtx1.y
 	magScanFunc scanFunc;			// span renderer for the primitive in flight
 	magScanFunc scanFuncFlat;		// planar-intensity span renderer
 	magScanFunc scanFuncPoly;		// per-scanline-intensity span renderer
@@ -600,18 +592,29 @@ ULONG MaggieSetupPoly(struct MaggieTransVertex *vtx __asm("a0"),
 
 /*****************************************************************************/
 
-// Scanline edge DDA, in maggie_buffers.s. Bound to lib->drawLineFunc per batch.
-void DrawLineAsm(void *edge __asm("a0"),
-				const struct MaggieTransVertex *v0 __asm("a1"),
-				const struct MaggieTransVertex *v1 __asm("a2"),
-				float corrFactor __asm("fp0"),
-				float preStep0 __asm("fp1"),
-				int lineLen __asm("d0"));
-void DrawLineAffineAsm(void *edge __asm("a0"),
-				const struct MaggieTransVertex *v0 __asm("a1"),
-				const struct MaggieTransVertex *v1 __asm("a2"),
-				float corrFactor __asm("fp0"),
-				float preStep0 __asm("fp1"),
-				int lineLen __asm("d0"));
+// Scanline edge DDAs, generated from raster/edge_walk.inc by maggie_edgewalk.s.
+// One is bound to lib->edgeFuncDown / lib->edgeFuncUp per batch, so each edge
+// stores exactly the columns its span renderer will read back:
+//
+//   Left …WZ  perspective + depth    x i u v z oow
+//   Left …W   perspective            x i u v   oow
+//   Left …Z   affine + depth         x i u v z
+//   Left      affine                 x i u v
+//   RightI    polygon source         x     iRight
+//   Right     triangle source        x
+#define EDGE_WALKER(name) \
+	void name(void *edge __asm("a0"), \
+				const struct MaggieTransVertex *v0 __asm("a1"), \
+				const struct MaggieTransVertex *v1 __asm("a2"), \
+				float corrFactor __asm("fp0"), \
+				float preStep0 __asm("fp1"), \
+				int lineLen __asm("d0"))
+
+EDGE_WALKER(DrawEdgeLeftWZ);
+EDGE_WALKER(DrawEdgeLeftW);
+EDGE_WALKER(DrawEdgeLeftZ);
+EDGE_WALKER(DrawEdgeLeft);
+EDGE_WALKER(DrawEdgeRightI);
+EDGE_WALKER(DrawEdgeRight);
 
 #endif // MAGGIE_INTERNAL_H_INCLUDED

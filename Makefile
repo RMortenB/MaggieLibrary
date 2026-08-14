@@ -18,6 +18,7 @@ SOURCES=maggie.c \
 		raster/maggie_raster.s \
 		maggie_texture.c \
 		maggie_buffers.s \
+		maggie_edgewalk.s \
 		maggie_setuptri.s \
 		maggie_setuppoly.s \
 		maggie_dxt1.c \
@@ -96,6 +97,9 @@ clean:
 
 # The .s files have no automatic dependency scanning, so name the shared include
 # explicitly - it carries the hardcoded MaggieBase offsets.
-raster/maggie_raster.o maggie_buffers.o maggie_setuptri.o maggie_setuppoly.o: raster/raster_structs.i
+raster/maggie_raster.o maggie_buffers.o maggie_edgewalk.o maggie_setuptri.o maggie_setuppoly.o: raster/raster_structs.i
+maggie_edgewalk.o: raster/edge_walk.inc
+raster/maggie_raster.o: raster/raster_affine.inc raster/raster_affine_depth.inc \
+	raster/raster_perspective16.inc raster/raster_perspective16_depth.inc
 
 -include $(DEPS) maggie_static.d

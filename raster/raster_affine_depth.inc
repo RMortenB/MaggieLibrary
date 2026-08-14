@@ -23,12 +23,12 @@
 	; from the middle scanline (the midpoint trick): one divide, still hoisted.
 	move.l	d5,d2
 	lsr.l	#1,d2
-	mulu.w	#EAffPos_Size,d2
-	fmove.s	EAffPos_xPosRight(a2,d2),e0
-	fsub.s	EAffPos_xPosLeft(a2,d2),e0	; xDiff at middle scanline
+	mulu.w	#EPos_Size,d2
+	fmove.s	EPos_xPosRight(a2,d2),e0
+	fsub.s	EPos_xPosLeft(a2,d2),e0	; xDiff at middle scanline
 	fdiv	e0,e4,e0					; ooXLength = 1 / xDiff
-	fmove.s	EAffPos_iRight(a2,d2),e13
-	fsub.s	EAffPos_iLeft(a2,d2),e13	; iDiff at middle scanline
+	fmove.s	EPos_iRight(a2,d2),e13
+	fsub.s	EPos_iLeft(a2,d2),e13	; iDiff at middle scanline
 	fmul	e0,e13						; iDDA = iDiff * ooXLength
 	else
 	; triangle path: intensity is planar, take it from the fan-sum gradient.
@@ -46,8 +46,8 @@
 	lea		(a3,d0.l*.bpp),a3		; pixels
 	lea		(a4,d0.l*2),a4			; zbuffer
 .vLoop:
-	fmove.s	EAffPos_xPosLeft(a2),e0	; xLeft
-	fmove.s	EAffPos_xPosRight(a2),e1; xRight
+	fmove.s	EPos_xPosLeft(a2),e0	; xLeft
+	fmove.s	EPos_xPosRight(a2),e1; xRight
 
 	fmove.l	e0,d3					; xStart = (int)xLeft;
 	fmove.l	e1,d4					; xEnd = (int)xRight;
@@ -73,10 +73,11 @@
 	move.l	a1,Maggie_depthDest(a0)
 
 	fsub	e0,e2,e2				; preStep = 1 + xStart - edges[i].xPosLeft
-	fmove.s	EAffPos_zLeft(a2),e10	; zLeft
-	fmove.s	EAffPos_iLeft(a2),e12	; iLeft
-	fmove.s	EAffPos_uLeft(a2),e17	; uowLeft
-	fmove.s	EAffPos_vLeft(a2),e20	; vowLeft
+	; Ascending row order: this variant reads offsets 0..20, a contiguous prefix.
+	fmove.s	EPos_iLeft(a2),e12	; iLeft (8)
+	fmove.s	EPos_uLeft(a2),e17	; uLeft (12)
+	fmove.s	EPos_vLeft(a2),e20	; vLeft (16)
+	fmove.s	EPos_zLeft(a2),e10	; zLeft (20)
 	fmul	e2,e11,e7				; preStepZ = preStep * zDDA
 	fmul	e2,e13,e8				; preStepI = preStep * iDDA
 	fmul	e2,e18,e19				; preStepU = preStep * uDDA
@@ -101,7 +102,7 @@
 .noPixels:
 	lea		(a3,d2.l*.bpp),a3			;pixels += modulo
 	lea		(a4,d2.l*2),a4			;zbuffer += modulo
-	lea		EAffPos_Size(a2),a2
+	lea		EPos_Size(a2),a2
 
 	subq.l	#1,d5 ; ylen
 	bne		.vLoop

@@ -54,10 +54,13 @@
 	fmove.s	Grad_uowDDA(a1),e18		; uDDA
 	fmove.s	Grad_vowDDA(a1),e21		; vDDA
 
-	fmove.s	EPos_iLeft(a2),e12		; iowLeft
-	fmove.s	EPos_oowLeft(a2),e14	; oowLeft
-	fmove.s	EPos_uowLeft(a2),e17	; uowLeft
-	fmove.s	EPos_vowLeft(a2),e20	; vowLeft
+	; Ascending row order, which is the order the walker laid them down: the row
+	; is read forward and the prefetch follows. oowLeft is last because z, the
+	; field between v and oow, belongs to the depth variants only.
+	fmove.s	EPos_iLeft(a2),e12		; iLeft   (8)
+	fmove.s	EPos_uLeft(a2),e17		; uowLeft (12)
+	fmove.s	EPos_vLeft(a2),e20		; vowLeft (16)
+	fmove.s	EPos_oowLeft(a2),e14	; oowLeft (24)
 
 	fsub	e0,e2,e2				; preStep = 1 + xStart - edges[i].xPosLeft
 

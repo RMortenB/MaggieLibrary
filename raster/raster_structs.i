@@ -11,33 +11,36 @@
 		FLOAT TransVtx_I
 		LONG TransVtx_Size
 
+; One scanline of the edge table: 32 bytes, one fixed layout for every draw
+; mode. Mirrored by magEdgePos in maggie_internal.h, which a _Static_assert in
+; maggie_draw.c pins to these offsets.
+;
+; The field order is the order the span renderers READ them, so a scanline walks
+; the row forward and the prefetch follows. Only the two right-hand values the
+; span code actually consumes are stored - xPosRight for the span end and iRight
+; for non-planar intensity. There is no right-hand z/u/v/oow: nothing ever read
+; them.
+;
+; The tail fields are the optional ones, so every variant reads a prefix of the
+; row plus, at most, iRight:
+;
+;   affine                  0..16          affine + depth        0..20
+;   perspective             0..16, 24      perspective + depth    0..24
+;   ...Poly variants add iRight at 28.
+;
+; z before oow puts affine+depth - the mode picked for speed - on a contiguous
+; prefix, at the cost of one skipped word in perspective-without-depth. Swap the
+; two if that ever measures the other way round.
 	STRUCTURE EPos,0
-		FLOAT EPos_xPosLeft
-		FLOAT EPos_xPosRight
-		FLOAT EPos_zLeft
-		FLOAT EPos_zRight
-		FLOAT EPos_iLeft
-		FLOAT EPos_iRight
-		FLOAT EPos_oowLeft
-		FLOAT EPos_oowRight
-		FLOAT EPos_uowLeft
-		FLOAT EPos_uowRight
-		FLOAT EPos_vowLeft
-		FLOAT EPos_vowRight
-		LONG EPos_Size
-
-	STRUCTURE EAffPos,0
-		FLOAT EAffPos_xPosLeft
-		FLOAT EAffPos_xPosRight
-		FLOAT EAffPos_zLeft
-		FLOAT EAffPos_zRight
-		FLOAT EAffPos_iLeft
-		FLOAT EAffPos_iRight
-		FLOAT EAffPos_uLeft
-		FLOAT EAffPos_uRight
-		FLOAT EAffPos_vLeft
-		FLOAT EAffPos_vRight
-		LONG EAffPos_Size
+		FLOAT EPos_xPosLeft		; 0  | every variant
+		FLOAT EPos_xPosRight	; 4  | every variant
+		FLOAT EPos_iLeft		; 8  | every variant
+		FLOAT EPos_uLeft		; 12 | every variant (u, or u/w if perspective)
+		FLOAT EPos_vLeft		; 16 | every variant
+		FLOAT EPos_zLeft		; 20 | MAG_DRAWMODE_DEPTHBUFFER only
+		FLOAT EPos_oowLeft		; 24 | perspective only
+		FLOAT EPos_iRight		; 28 | ...Poly variants only
+		LONG EPos_Size			; 32
 
 	STRUCTURE Scsr,0
 		LONG Scsr_x0
@@ -102,7 +105,7 @@ ENDM
 ; rather than the asm silently reading the wrong field. All of them sit ahead of
 ; the #if PROFILE block in the struct, so one set of offsets is correct for both
 ; the normal and the PROFILE=1 build.
-MB_gradients	EQU	52312
-MB_cullSign	EQU	175594
-MB_primMinY	EQU	175598
-MB_primMaxY	EQU	175602
+MB_gradients	EQU	35032
+MB_cullSign	EQU	158314
+MB_primMinY	EQU	158318
+MB_primMaxY	EQU	158322

@@ -13,10 +13,23 @@ float getBestDistance(magGradients *res, const struct MaggieTransVertex *vtx, in
 // GetGradientsPtr, and MaggieSetupTri reads cullSign and writes primMinY/primMaxY.
 // Keep these in lockstep - a layout change must fail the build here, not corrupt
 // a field at runtime.
-_Static_assert(__builtin_offsetof(MaggieBase, gradients) == 52312, "MB_gradients in raster/raster_structs.i is stale");
-_Static_assert(__builtin_offsetof(MaggieBase, cullSign) == 175594, "MB_cullSign in raster/raster_structs.i is stale");
-_Static_assert(__builtin_offsetof(MaggieBase, primMinY) == 175598, "MB_primMinY in raster/raster_structs.i is stale");
-_Static_assert(__builtin_offsetof(MaggieBase, primMaxY) == 175602, "MB_primMaxY in raster/raster_structs.i is stale");
+_Static_assert(__builtin_offsetof(MaggieBase, gradients) == 35032, "MB_gradients in raster/raster_structs.i is stale");
+_Static_assert(__builtin_offsetof(MaggieBase, cullSign) == 158314, "MB_cullSign in raster/raster_structs.i is stale");
+_Static_assert(__builtin_offsetof(MaggieBase, primMinY) == 158318, "MB_primMinY in raster/raster_structs.i is stale");
+_Static_assert(__builtin_offsetof(MaggieBase, primMaxY) == 158322, "MB_primMaxY in raster/raster_structs.i is stale");
+
+// The edge table's own layout is equally hardcoded: STRUCTURE EPos in
+// raster/raster_structs.i, read by the span renderers and written by the edge
+// walkers in maggie_edgewalk.s. Field order is the span renderers' read order.
+_Static_assert(sizeof(magEdgePos) == 32, "EPos_Size in raster/raster_structs.i is stale");
+_Static_assert(__builtin_offsetof(magEdgePos, xPosLeft) == 0, "EPos_xPosLeft is stale");
+_Static_assert(__builtin_offsetof(magEdgePos, xPosRight) == 4, "EPos_xPosRight is stale");
+_Static_assert(__builtin_offsetof(magEdgePos, iLeft) == 8, "EPos_iLeft is stale");
+_Static_assert(__builtin_offsetof(magEdgePos, uLeft) == 12, "EPos_uLeft is stale");
+_Static_assert(__builtin_offsetof(magEdgePos, vLeft) == 16, "EPos_vLeft is stale");
+_Static_assert(__builtin_offsetof(magEdgePos, zLeft) == 20, "EPos_zLeft is stale");
+_Static_assert(__builtin_offsetof(magEdgePos, oowLeft) == 24, "EPos_oowLeft is stale");
+_Static_assert(__builtin_offsetof(magEdgePos, iRight) == 28, "EPos_iRight is stale");
 /*****************************************************************************/
 
 /*****************************************************************************/
@@ -95,32 +108,36 @@ static void BeginDrawBatch(MaggieBase *lib)
 
 	UWORD mode = lib->drawMode;
 
-	// xPosLeft/xPosRight sit at offset 0/4 of both edge layouts, so the two
-	// column bases are the same for affine and perspective.
-	UBYTE *left = (UBYTE *)lib->magEdge;
-	UBYTE *right = left + sizeof(float);
+	// Pick the pair of edge walkers this batch needs. Each writes exactly the
+	// columns its span renderer reads back: the left one drops oow when the
+	// mapping is affine and z when there is no depth buffer, and the right one
+	// carries iRight only for a polygon source, since sourceIsPoly is what
+	// decides whether the …Poly span renderers - iRight's only readers - are
+	// reachable at all (see SelectScanFunctions).
+	magDrawLineFunc left;
+	magDrawLineFunc right;
 
 	if(mode & MAG_DRAWMODE_AFFINE_MAPPING)
 	{
-		lib->drawLineFunc = DrawLineAffineAsm;
-		lib->edgeStride = sizeof(magEdgePosAffine);
+		left = (mode & MAG_DRAWMODE_DEPTHBUFFER) ? DrawEdgeLeftZ : DrawEdgeLeft;
 	}
 	else
 	{
-		lib->drawLineFunc = DrawLineAsm;
-		lib->edgeStride = sizeof(magEdgePos);
+		left = (mode & MAG_DRAWMODE_DEPTHBUFFER) ? DrawEdgeLeftWZ : DrawEdgeLeftW;
 	}
+
+	right = lib->sourceIsPoly ? DrawEdgeRightI : DrawEdgeRight;
 
 	if(mode & MAG_DRAWMODE_CULL_CCW)
 	{
-		lib->edgeBaseDown = right;
-		lib->edgeBaseUp = left;
+		lib->edgeFuncDown = right;
+		lib->edgeFuncUp = left;
 		lib->cullSign = -1.0f;
 	}
 	else
 	{
-		lib->edgeBaseDown = left;
-		lib->edgeBaseUp = right;
+		lib->edgeFuncDown = left;
+		lib->edgeFuncUp = right;
 		lib->cullSign = 1.0f;
 	}
 

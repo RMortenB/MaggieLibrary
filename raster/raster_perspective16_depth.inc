@@ -55,11 +55,16 @@
 	fmove.s	Grad_uowDDA(a1),e18		; uDDA
 	fmove.s	Grad_vowDDA(a1),e21		; vDDA
 
-	fmove.s	EPos_zLeft(a2),e10		; zLeft
-	fmove.s	EPos_iLeft(a2),e12		; iowLeft
-	fmove.s	EPos_oowLeft(a2),e14	; oowLeft
-	fmove.s	EPos_uowLeft(a2),e17	; uowLeft
-	fmove.s	EPos_vowLeft(a2),e20	; vowLeft
+	; Ascending row order, which is the order the walker laid them down: this
+	; variant reads the whole 32-byte row, forward, so the prefetch follows. The
+	; cost is that zLeft - which feeds the longest dependency chain here, through
+	; the fadd/fsub/fmove.l into Maggie_depthStart - now loads fourth rather than
+	; first. Move it back ahead of iLeft if that ever shows up in a profile.
+	fmove.s	EPos_iLeft(a2),e12		; iLeft   (8)
+	fmove.s	EPos_uLeft(a2),e17		; uowLeft (12)
+	fmove.s	EPos_vLeft(a2),e20		; vowLeft (16)
+	fmove.s	EPos_zLeft(a2),e10		; zLeft   (20)
+	fmove.s	EPos_oowLeft(a2),e14	; oowLeft (24)
 
 	fsub	e0,e2,e2				; preStep = 1 + xStart - xPosLeft
 
