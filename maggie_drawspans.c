@@ -65,10 +65,12 @@ void DrawScanlines16AffinePoly(int ymin __asm("d0"), int ymax __asm("d1"), Maggi
 void DrawScanlines32IZ(int ymin __asm("d0"), int ymax __asm("d1"), MaggieBase *lib __asm("a6"));
 void DrawScanlines32IZPoly(int ymin __asm("d0"), int ymax __asm("d1"), MaggieBase *lib __asm("a6"));
 void DrawScanlines32(int ymin __asm("d0"), int ymax __asm("d1"), MaggieBase *lib __asm("a6"));
+void DrawScanlines32Poly(int ymin __asm("d0"), int ymax __asm("d1"), MaggieBase *lib __asm("a6"));
 
 void DrawScanlines16IZ(int ymin __asm("d0"), int ymax __asm("d1"), MaggieBase *lib __asm("a6"));
 void DrawScanlines16IZPoly(int ymin __asm("d0"), int ymax __asm("d1"), MaggieBase *lib __asm("a6"));
 void DrawScanlines16(int ymin __asm("d0"), int ymax __asm("d1"), MaggieBase *lib __asm("a6"));
+void DrawScanlines16Poly(int ymin __asm("d0"), int ymax __asm("d1"), MaggieBase *lib __asm("a6"));
 
 /*****************************************************************************/
 
@@ -134,13 +136,13 @@ void SelectScanFunctions(MaggieBase *lib)
 			if(mode & MAG_DRAWMODE_32BIT)
 			{
 				lib->scanFuncFlat = DrawScanlines32;
+				lib->scanFuncPoly = DrawScanlines32Poly;
 			}
 			else
 			{
 				lib->scanFuncFlat = DrawScanlines16;
+				lib->scanFuncPoly = DrawScanlines16Poly;
 			}
-			// No depth buffer -> no per-scanline intensity variant exists.
-			lib->scanFuncPoly = lib->scanFuncFlat;
 		}
 	}
 

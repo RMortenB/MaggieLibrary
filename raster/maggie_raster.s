@@ -7,8 +7,17 @@
 
 _DrawScanlines32:
 .bpp = 4
+.polyIntensity = 0
 	include "raster/raster_perspective16.inc"
 	public _DrawScanlines32
+
+;------------------------------------------------------------------------------
+
+_DrawScanlines32Poly:
+.bpp = 4
+.polyIntensity = 1
+	include "raster/raster_perspective16.inc"
+	public _DrawScanlines32Poly
 
 ;------------------------------------------------------------------------------
 
@@ -63,8 +72,17 @@ _DrawScanlines32ZAffinePoly:
 
 _DrawScanlines16:
 .bpp = 2
+.polyIntensity = 0
 	include "raster/raster_perspective16.inc"
 	public _DrawScanlines16
+
+;------------------------------------------------------------------------------
+
+_DrawScanlines16Poly:
+.bpp = 2
+.polyIntensity = 1
+	include "raster/raster_perspective16.inc"
+	public _DrawScanlines16Poly
 
 ;------------------------------------------------------------------------------
 

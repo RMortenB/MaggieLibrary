@@ -35,31 +35,45 @@
 	sub.l	d3,d4					;len = x1 - x0
 	ble		.noPixels
 
-	fadd.l	d3,e4,e2
-	fsub	e0,e1,e3	; xDiff = xRight - xLeft
+	fadd.l	d3,e4,e2				; xStart + 1
 
 	lea		(a3,d3.l*.bpp),a1			;dstColPtr = pixels + xStart
 	move.l	a1,Maggie_pixDest(a0)
 
+	; Per-polygon fan-sum gradients for oow/u/v (both paths). u/w, v/w and 1/w
+	; are linear in screen space, so these are the same values the edge-to-edge
+	; difference used to produce - minus the per-scanline fdiv, and minus its
+	; blow-up on a sub-pixel-wide span.
+	;
+	; Reloaded inside .vLoop rather than hoisted above it, as in
+	; raster_perspective16_depth.inc: the span loops below consume e15/e18/e21
+	; destructively (fmul.l d4,e15 in .singlePixels) and e0-e22 are all live
+	; here, so there is no spare register to keep a copy in.
+	GetGradientsPtr a1
+	fmove.s	Grad_oowDDA(a1),e15		; wDDA
+	fmove.s	Grad_uowDDA(a1),e18		; uDDA
+	fmove.s	Grad_vowDDA(a1),e21		; vDDA
+
 	fmove.s	EPos_iLeft(a2),e12		; iowLeft
-	fmove.s	EPos_iRight(a2),e13		; iowRight
+	fmove.s	EPos_oowLeft(a2),e14	; oowLeft
+	fmove.s	EPos_uowLeft(a2),e17	; uowLeft
+	fmove.s	EPos_vowLeft(a2),e20	; vowLeft
 
 	fsub	e0,e2,e2				; preStep = 1 + xStart - edges[i].xPosLeft
+
+	ifne	.polyIntensity
+	; polygon path: intensity is non-planar across >3 verts - interpolate
+	; per-scanline (edge to edge), which needs the reciprocal.
+	fsub	e0,e1,e3				; xDiff = xRight - xLeft
 	fdiv	e3,e4,e3				; ooXLength = 1.0f / xDiff
-	fmove.s	EPos_oowLeft(a2),e14	; oowLeft
-	fmove.s	EPos_oowRight(a2),e15	; oowRight
-	fmove.s	EPos_uowLeft(a2),e17	; uowLeft
-	fmove.s	EPos_uowRight(a2),e18	; uowRight
-	fmove.s	EPos_vowLeft(a2),e20	; vowLeft
-	fmove.s	EPos_vowRight(a2),e21	; vowRight
-	fsub	e12,e13					; iDiff = iRight - iLeft
-	fsub	e14,e15					; wDiff = oowRight - oowLeft
-	fsub	e17,e18					; uDiff = uRight - uLeft
-	fsub	e20,e21					; vDiff = vRight - vLeft
+	fmove.s	EPos_iRight(a2),e13		; iowRight
+	fsub	e12,e13					; iDiff = iowRight - iowLeft
 	fmul	e3,e13					; iDDA = iDiff * ooXLength
-	fmul	e3,e15					; wDDA = wDiff * ooXLength
-	fmul	e3,e18					; uDDA = uDiff * ooXLength
-	fmul	e3,e21					; vDDA = vDiff * ooXLength
+	else
+	; triangle path: intensity is planar, take it from the fan-sum gradient.
+	fmove.s	Grad_iDDA(a1),e13		; iDDA
+	endc
+
 	fmul	e2,e13,e8				; preStepI = preStep * iDDA
 	fmul	e2,e15,e16				; preStepW = preStep * wDDA
 	fmul	e2,e18,e19				; preStepU = preStep * uDDA
@@ -124,7 +138,7 @@
 	fmul.l	d4,e18
 	fmul.l	d4,e21
 
-	fdiv	d4,e4,e7
+	fdiv.l	d4,e4,e7
 
 	fadd	e15,e14
 	fadd	e18,e17
