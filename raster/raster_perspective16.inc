@@ -40,24 +40,13 @@
 	lea		(a3,d3.l*.bpp),a1			;dstColPtr = pixels + xStart
 	move.l	a1,Maggie_pixDest(a0)
 
-	; Per-polygon fan-sum gradients for oow/u/v (both paths). u/w, v/w and 1/w
-	; are linear in screen space, so these are the same values the edge-to-edge
-	; difference used to produce - minus the per-scanline fdiv, and minus its
-	; blow-up on a sub-pixel-wide span.
-	;
-	; Reloaded inside .vLoop rather than hoisted above it, as in
-	; raster_perspective16_depth.inc: the span loops below consume e15/e18/e21
-	; destructively (fmul.l d4,e15 in .singlePixels) and e0-e22 are all live
-	; here, so there is no spare register to keep a copy in.
+	; Per-polygon fan-sum gradients for oow/u/v (both paths). Reloaded per row rather than hoisted: the span loops consume e15/e18/e21 destructively and every e-register is live here.
 	GetGradientsPtr a1
 	fmove.s	Grad_oowDDA(a1),e15		; wDDA
 	fmove.s	Grad_uowDDA(a1),e18		; uDDA
 	fmove.s	Grad_vowDDA(a1),e21		; vDDA
 
-	; The row, walked forward with post-increment. This variant has one gap - it
-	; skips zLeft (20), which belongs to the depth variants - so oowLeft is reached
-	; by displacement off the post-gap position rather than by paying an extra add
-	; to step over z. That leaves a2 at 20, and the tail closes the row.
+	; The row, walked forward with post-increment: skips zLeft (20), so oowLeft is reached by displacement and a2 is left at 20 for the tail.
 	fmove.s	(a2)+,e12				; iLeft   (8)
 	fmove.s	(a2)+,e17				; uowLeft (12)
 	fmove.s	(a2)+,e20				; vowLeft (16)
@@ -66,8 +55,7 @@
 	fsub	e0,e2,e2				; preStep = 1 + xStart - edges[i].xPosLeft
 
 	ifne	.polyIntensity
-	; polygon path: intensity is non-planar across >3 verts - interpolate
-	; per-scanline (edge to edge), which needs the reciprocal.
+	; polygon path: intensity is non-planar across >3 verts - interpolate edge to edge per scanline.
 	fsub	e0,e1,e3				; xDiff = xRight - xLeft
 	fdiv	e3,e4,e3				; ooXLength = 1.0f / xDiff
 	fmove.s	8(a2),e13				; iowRight (28), a2 is at zLeft (20)
@@ -164,13 +152,7 @@
 	fmove.l	e11,Maggie_vDelta(a0)
 	move.w	d4,Maggie_startLength(a0)
 
-	; Drawn-row tail. The post-increment walk stopped at zLeft (20), the field this
-	; variant skips, so 12 bytes of the row are still ahead of a2. .singlePixels
-	; lands here too when the span ended on a chunk boundary.
-	;
-	; The tail is duplicated rather than shared with .noPixels because the two
-	; paths owe a2 different amounts: sharing one tail would need a branch around
-	; the fixup on every scanline, which costs more than the add it saves.
+	; Drawn-row tail: 12 bytes remain from the skipped zLeft (20) on. Duplicated rather than shared with .noPixels, which owes a2 a different amount.
 .rowDone:
 	lea		12(a2),a2					; zLeft (20) -> next row
 	lea		(a3,d2.l*.bpp),a3			;pixels += modulo

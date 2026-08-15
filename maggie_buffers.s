@@ -85,10 +85,7 @@ _GetClocks:
 	rts
 	public _GetClocks
 
-; The scanline-edge DDAs used to live here as one shared routine per mapping
-; mode, filling both edge columns via a base+4 offset. They now live in
-; maggie_edgewalk.s, generated per column side and draw mode from
-; raster/edge_walk.inc so each edge writes only the columns that get read back.
+; The scanline-edge DDAs live in maggie_edgewalk.s, generated per column side and draw mode from raster/edge_walk.inc.
 
 _setRoundingModeRZ:
 	fmove.l	fpcr,d0

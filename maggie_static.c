@@ -1,18 +1,6 @@
-/*
- * maggie_static.c - static-link context lifecycle for maggie.library.
- *
- * The shared/resident library relies on exec's RTF_AUTOINIT machinery to
- * allocate the MaggieBase, build the LVO jump table and call maggieInit()
- * (see maggie.c). A statically linked host has none of that, so this file
- * provides a plain-C create/destroy pair that does the same real work by
- * hand: it allocates a MaggieBase, initialises it exactly as maggieInit()
- * does, and tears it down exactly as maggieExpunge() does - minus the OS
- * library bookkeeping (Node/Flags/segList, jump table, open-count) which is
- * meaningless without the shared-library mechanism.
- *
- * The MaggieBase struct itself is used unchanged (including the embedded
- * struct Library first member) so all asm-hardcoded field offsets stay valid.
- */
+/* maggie_static.c - static-link context lifecycle for maggie.library. */
+/* A statically linked host has no RTF_AUTOINIT, so this is a plain-C create/destroy pair doing the same work as maggieInit()/maggieExpunge() in maggie.c, minus the OS library bookkeeping. */
+/* MaggieBase is used unchanged, embedded struct Library and all, so the asm-hardcoded field offsets stay valid. */
 
 #include <proto/exec.h>
 #include <exec/memory.h>
@@ -65,8 +53,7 @@ struct Library *magCreateContext(void)
 	lib->clearColour = 0x00000000;
 	lib->clearDepth = 0xffff;
 
-	/* AllocMem(MEMF_CLEAR) already NULLed the handle tables and
-	 * dummyTextureData, so only the non-zero state needs setting. */
+	/* AllocMem(MEMF_CLEAR) already NULLed the handle tables and dummyTextureData, so only the non-zero state needs setting. */
 	for(int i = 0; i < MAG_MAX_LIGHTS; ++i)
 	{
 		lib->lights[i].type = MAG_LIGHT_OFF;

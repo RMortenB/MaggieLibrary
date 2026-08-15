@@ -2,10 +2,7 @@
 #include <proto/exec.h>
 #include <proto/lowlevel.h>
 
-/*
- * StaticCube - the QuadCube demo, linked against the STATIC library
- * (libmaggie.a) instead of opening maggie.library at runtime.
- */
+/* StaticCube - the QuadCube demo, linked against the static library (libmaggie.a) instead of opening maggie.library at runtime. */
 
 #include <proto/Maggie_static.h>
 #include <maggie_vec.h>

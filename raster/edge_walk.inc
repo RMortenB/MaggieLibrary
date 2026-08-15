@@ -11,20 +11,11 @@
 ; The includer sets which columns to emit:
 ;
 ;	.rightSide	0 = left column, 1 = right column
-;	.doI		emit intensity (always set for a left column; for a right
-;			column only when the source can need iRight)
+;	.doI		emit intensity (always set for a left column; for a right column only when the source can need iRight)
 ;	.doZ		emit z	 (MAG_DRAWMODE_DEPTHBUFFER only, left column)
 ;	.doOow		emit 1/w (perspective only, left column)
 ;
-; u and v belong to the left column only - no span renderer reads a right-hand
-; u/v. Every emitted attribute costs one fmove.s + one fadd per scanline plus six
-; instructions of setup, so a variant writes only what its span renderer reads
-; back. The right column is the extreme case: two instructions per scanline for a
-; triangle source, four for a polygon source, against the twelve the single
-; shared walker used to spend filling four columns nothing read.
-;
-; Stores in .loop run in ascending offset order, which is also the order the span
-; renderer reads them - hence iLeft early (offset 8) but iRight last (28).
+; A variant emits only what its span renderer reads back; u/v are left-column only. Stores in .loop are in ascending offset order.
 ;
 ; Register map, accumulator / per-scanline delta:
 ;	x	e12 / e0		z	e16 / e4
@@ -40,8 +31,7 @@
 	endc
 
 ;--- v0: the starting value of each column -------------------------------------
-; Intensity is an integer in the vertex (MaggieTransVertex.colour) and a float in
-; the edge table, so it loads with fmove.l and stores with fmove.s.
+; Intensity is an int in the vertex and a float in the edge table: fmove.l in, fmove.s out.
 
 	fmove.s	TransVtx_PosX(a1),e12
 	ifne	.doI

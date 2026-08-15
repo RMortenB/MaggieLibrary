@@ -1,5 +1,8 @@
 #include "maggie_internal.h"
 
+// data[] is at a fixed 32 bytes so the aligned allocation in magAllocateTexture keeps the texture data itself 32-byte aligned; adding a field must not move it.
+_Static_assert(__builtin_offsetof(magTexture, data) == 32, "magTexture::alignmentPadding no longer pads data[] to 32");
+
 /*****************************************************************************/
 
 ULONG GetTextureMipMapSize(UWORD format, UWORD texSize)

@@ -19,8 +19,7 @@
 	fmove.l	e18,Maggie_uDelta(a0)
 	fmove.l	e21,Maggie_vDelta(a0)
 	ifne	.polyIntensity
-	; polygon path: intensity is non-planar - approximate with a single DDA taken
-	; from the middle scanline (the midpoint trick): one divide, still hoisted.
+	; polygon path: intensity is non-planar - approximate with one DDA taken from the middle scanline, still hoisted.
 	move.l	d5,d2
 	lsr.l	#1,d2
 	mulu.w	#EPos_Size,d2
@@ -73,10 +72,7 @@
 	move.l	a1,Maggie_depthDest(a0)
 
 	fsub	e0,e2,e2				; preStep = 1 + xStart - edges[i].xPosLeft
-	; The row, walked forward with post-increment: this variant reads offsets 0..20,
-	; a contiguous prefix, so no displacement and no gap to step over. oow (24) and
-	; iRight (28) belong to the other variants; iRight is read once from the middle
-	; scanline in the prologue, not here.
+	; The row, walked forward with post-increment: this variant reads 0..20, a contiguous prefix.
 	fmove.s	(a2)+,e12				; iLeft (8)
 	fmove.s	(a2)+,e17				; uLeft (12)
 	fmove.s	(a2)+,e20				; vLeft (16)
@@ -103,10 +99,7 @@
 	move.l	d0,Maggie_depthStart(a0)
 	move.w	d4,Maggie_startLength(a0)
 
-	; Drawn-row tail: the walk stopped after zLeft, so 8 bytes remain - an addq,
-	; not a lea. The tail is duplicated rather than shared with .noPixels because
-	; the two paths owe a2 different amounts, and sharing would cost a branch on
-	; every scanline.
+	; Drawn-row tail: 8 bytes remain. Duplicated rather than shared with .noPixels, which owes a2 a different amount.
 	addq.l	#8,a2					; oowLeft (24) + iRight (28)
 	lea		(a3,d2.l*.bpp),a3			;pixels += modulo
 	lea		(a4,d2.l*2),a4			;zbuffer += modulo

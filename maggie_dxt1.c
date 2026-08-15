@@ -14,10 +14,8 @@ typedef struct
 
 /*****************************************************************************/
 
-// DXT1 carries one bit of alpha: in a block where col0 <= col1, pixel index 3
-// means transparent. Maggie always honours that - it can't be switched off - so
-// a block holding any transparent texel must be encoded 3-colour, and a 4-colour
-// block must never end up with an index 3. Source alpha below this is transparent.
+// DXT1 carries one bit of alpha: in a block where col0 <= col1, index 3 means transparent, and Maggie always honours that.
+// So a block holding any transparent texel must be encoded 3-colour, and a 4-colour block must never end up with an index 3. Source alpha below this is transparent.
 #define ALPHA_THRESHOLD 128
 
 /*****************************************************************************/
@@ -181,8 +179,7 @@ void CompressRGB(UBYTE *dst, UBYTE *src, int width, int height, int pixelSize, i
 					UBYTE *pixel = &src[((y + i) * width + x + j) * pixelSize];
 					if((pixelSize == 4) && (pixel[3] < ALPHA_THRESHOLD))
 					{
-						// A transparent texel has no colour to reproduce - keep it out
-						// of the fit so its RGB (usually black) can't drag the endpoints.
+						// A transparent texel has no colour to reproduce - keep it out of the fit so its RGB can't drag the endpoints.
 						transMask |= 1 << (i * 4 + j);
 						continue;
 					}
@@ -217,9 +214,7 @@ void CompressRGB(UBYTE *dst, UBYTE *src, int width, int height, int pixelSize, i
 			}
 			else if(transMask)
 			{
-				// Mixed block: the transparent texels need index 3, so this one has to
-				// be 3-colour whatever it costs - QuantizeBlock4 must not see it, and
-				// neither must the 4-colour endpoint swap (it would turn 3 into 2).
+				// Mixed block: the transparent texels need index 3, so it must be 3-colour whatever it costs - neither QuantizeBlock4 nor the 4-colour endpoint swap may see it.
 				blk4 = 0;
 				if(block->col0 != block->col1)
 				{
@@ -227,8 +222,7 @@ void CompressRGB(UBYTE *dst, UBYTE *src, int width, int height, int pixelSize, i
 					float lowestError = QuantizeBlock3(block, &src[(y * width + x) * pixelSize], width, pixelSize, rVec, gVec, bVec, rMin, gMin, bMin, ooLenSq, transMask);
 					if(quality)
 					{
-						// Same alternate diagonals of the colour bounding box as the
-						// opaque path below, 3-colour only.
+						// Same alternate diagonals of the colour bounding box as the opaque path below, 3-colour only.
 						static const int gSign[3] = { 1, -1, -1 };
 						static const int bSign[3] = { -1, 1, -1 };
 						for(int c = 0; c < 3; ++c)
@@ -253,8 +247,7 @@ void CompressRGB(UBYTE *dst, UBYTE *src, int width, int height, int pixelSize, i
 				}
 				else
 				{
-					// Every opaque texel is the same colour, so index 0 is already exact
-					// for them and only the transparent ones need their index set.
+					// Every opaque texel is the same colour, so index 0 is already exact and only the transparent ones need their index set.
 					for(int i = 0; i < 16; ++i)
 					{
 						if(transMask & (1 << i))
@@ -337,10 +330,7 @@ void CompressRGB(UBYTE *dst, UBYTE *src, int width, int height, int pixelSize, i
 					}
 				}
 			}
-			// Put the endpoints the way round the decoder expects for the mode this
-			// block ended up in: col0 > col1 is 4-colour, col0 <= col1 is 3-colour.
-			// The 3-colour index remap leaves index 3 alone, so swapping can't
-			// disturb the transparent texels.
+			// Put the endpoints the way round the decoder expects for this block's mode: col0 > col1 is 4-colour, col0 <= col1 is 3-colour. The 3-colour index remap leaves index 3 alone, so swapping can't disturb the transparent texels.
 			if(blk4)
 			{
 				if(block->col0 < block->col1)
@@ -490,6 +480,8 @@ void SwizzleDXT1Texture(APTR data, int xres, int yres)
 		blocks[i] = tmpBlocks[i];
 	}
 }
+
+/*****************************************************************************/
 
 /*****************************************************************************/
 

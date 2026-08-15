@@ -9,61 +9,25 @@
 ;                       int n                         __asm("d0"),
 ;                       MaggieBase *lib               __asm("a6"));
 ;
-; Per-polygon setup: fan-sum area (which is also the gradient denominator),
-; screen-y span, and the five attribute gradients. indx may be NULL for a
-; contiguous fan; n must be >= 3, which the caller already checks.
+; Per-polygon setup: fan-sum area (which is also the gradient denominator), screen-y span, and the five attribute gradients.
+; indx may be NULL for a contiguous fan; n must be >= 3, which the caller already checks.
 ;
 ;   returns 0  -> skip this polygon (backfacing, or zero scanlines tall)
-;   returns 1  -> draw it; lib->gradients, lib->primMinY and lib->primMaxY
-;                 have been written
+;   returns 1  -> draw it; lib->gradients, lib->primMinY and lib->primMaxY have been written
 ;
 ; The caller still emits the edges and dispatches the span renderer.
 ;
-;------------------------------------------------------------------------------
-; WHY THIS SHAPE
-;
-; The C version walked the fan twice: once for the area and the y span, then
-; again for the five numerators. Under the 68080 model (one FP instruction issued
-; per cycle, ~6 cycle results, in-order, stalls only on an unready operand) those
-; measured 57 and 157 cycles per fan step, 61% and 50% idle - so both passes were
-; spending most of their time waiting, and each had exactly the independent work
-; the other needed to fill those gaps.
-;
-; Fusing them is therefore cheaper on BOTH paths, which is worth stating because
-; it is the opposite of the usual trade: a culled polygon now computes numerators
-; it throws away, but it does so in cycles the area pass was stalling in anyway,
-; and it no longer pays for a second loop setup.
-;
-; The six accumulators - denom plus the five numerators - are six independent
-; chains. Each attribute's two deltas are multiplied, subtracted and accumulated
-; entirely IN PLACE in the register pair that held the deltas, so six chains need
-; no temporaries at all, and issuing them stage by stage leaves exactly six
-; independent instructions between every producer and its consumer. That covers
-; the whole 6-cycle latency.
-;
-; The accumulate is loop-carried, but the next step's add to any given
-; accumulator is ~38 instructions later, far beyond the latency, so the carry
-; never stalls.
-;
-; Both deltas are recomputed each step rather than carried from the previous one.
-; Carrying would save seven subtracts but cost seven register moves, so it is a
-; wash - and recomputing keeps the accumulation order identical to the C, which
-; makes the result bit-exact rather than merely equivalent.
-;
-; Modelled at ~52 cycles per fan step against ~214 for the two C loops.
+; One fused fan walk instead of the C's two (area+span, then the numerators): each pass was >50% idle on stalls and had exactly the independent work the other needed, so fusing is cheaper on both the drawn and the culled path.
+; The six accumulators - denom plus five numerators - are six independent chains, accumulated in place in the register pair that held the deltas and issued stage by stage, which covers the whole 6-cycle latency without temporaries.
+; Both deltas are recomputed per step rather than carried: a wash on instruction count, and it keeps the accumulation order bit-exact with the C.
 ;------------------------------------------------------------------------------
 ; SIGNS
 ;
-; Every delta is formed as (v0 - vi) rather than (vi - v0), because that lets the
-; load fuse into the subtract as fsub.s <ea>,eSrc,eDst. Both the attribute delta
-; AND its y multiplier are negated this way, so the two negations cancel inside
-; each product:
+; Every delta is formed as (v0 - vi) so the load fuses into the subtract. The attribute delta AND its y multiplier are both negated, so the negations cancel:
 ;
 ;   (-di)*(-dyj) - (-dj)*(-dyi)  ==  di*dyj - dj*dyi
 ;
-; The accumulators therefore hold exactly the C values and the scale is +1/denom.
-; (Contrast MaggieSetupTri, which negates only the attribute deltas and so needs
-; -1/denom.)
+; The accumulators therefore hold exactly the C values and the scale is +1/denom (contrast MaggieSetupTri, which negates only the attribute deltas and needs -1/denom).
 ;------------------------------------------------------------------------------
 ; REGISTERS
 ;   e0..e6     v0's x,y,w,u,v,z,i     the fan origin, live for the whole loop
@@ -77,8 +41,7 @@
 ;   d1 min y   d2 max y   d3 scratch/index   d4 trip count
 ;   a1 vi      a2 vj      a3 index walk      a4 vertex base
 ;
-; fp2-fp5 are callee-saved, so they are saved on entry - but this is a loop, so
-; that is paid once per fan rather than per step.
+; fp2-fp5 are callee-saved and saved on entry - paid once per fan, not per step.
 ;------------------------------------------------------------------------------
 
 _MaggieSetupPoly:
@@ -150,8 +113,8 @@ _MaggieSetupPoly:
 ;==============================================================================
 
 .indexedLoop:
-	fmove.s	TransVtx_PosY(a2),fp5	; the span's y, issued at the top so its
-	fintrz	fp5,fp5			; truncation is ready by the loop tail
+	fmove.s	TransVtx_PosY(a2),fp5	; the span's y, issued at the top so the truncation is ready by the loop tail
+	fintrz	fp5,fp5
 
 	fsub.s	TransVtx_PosY(a1),e1,e13	; -dyi = y0 - yi
 	fsub.s	TransVtx_PosY(a2),e1,e14	; -dyj = y0 - yj
@@ -206,8 +169,8 @@ _MaggieSetupPoly:
 	move.l	d3,d2
 .iNoMax:
 	subq.l	#1,d4
-	beq.w	.fanDone		; tested BEFORE advancing, so the last step does
-	movea.l	a2,a1			; not read indx[n] past the polygon
+	beq.w	.fanDone		; tested BEFORE advancing, so the last step never reads indx[n] past the polygon
+	movea.l	a2,a1
 	moveq	#0,d3
 	move.w	(a3)+,d3
 	lsl.l	#5,d3
@@ -281,9 +244,7 @@ _MaggieSetupPoly:
 	bra.w	.linearLoop
 
 ;--- cull, span and the gradient scale -----------------------------------------
-; Polygons reject area >= 0 where triangles reject area > 0 - preserved from the
-; C. area is the cull-signed fan area, so after that test it is < 0 and the old
-; two-sided epsilon check collapses to one compare.
+; Polygons reject area >= 0 where triangles reject area > 0, preserved from the C. area is cull-signed, so after that test it is < 0 and the epsilon check is one compare.
 
 .fanDone:
 	fmul	e7,fp0			; area = denom * cullSign
@@ -299,8 +260,7 @@ _MaggieSetupPoly:
 	ftst	fp0
 	fbge	.skip			; backfacing
 
-; Hex bit pattern, not a decimal literal: vasm silently assembles "#-1e-6" as
-; -0.0, which would make the fbgt below always false and kill the guard.
+; Hex bit pattern, not a decimal literal: vasm silently assembles "#-1e-6" as -0.0, which would make the fbgt always false and kill the guard.
 	fcmp.s	#$B58637BD,fp0		; -1e-6
 	fbgt	.degenerate
 	fdiv	e7,e13			; 1.0 / denom

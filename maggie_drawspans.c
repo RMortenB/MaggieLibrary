@@ -78,10 +78,7 @@ void DrawScanlinesNIZ(int ymin __asm("d0"), int ymax __asm("d1"), int pixelSize 
 
 /*****************************************************************************/
 
-// Resolve both intensity variants of the span renderer for the current
-// drawMode. Called once per batch from BeginDrawBatch(); the per-primitive path
-// then just picks one of the two pointers instead of walking this branch tree
-// for every triangle.
+// Resolves both intensity variants of the span renderer for the current drawMode, once per batch from BeginDrawBatch(); the per-primitive path then just picks one of the two pointers.
 
 void SelectScanFunctions(MaggieBase *lib)
 {
@@ -148,17 +145,14 @@ void SelectScanFunctions(MaggieBase *lib)
 
 	lib->scanFunc = lib->scanFuncFlat;
 
-	// Only magDrawIndexedPolygons can produce non-planar intensity; collapsing
-	// the two pointers here saves the source test in the per-primitive path.
+	// Only magDrawIndexedPolygons can produce non-planar intensity; collapsing the two pointers here saves the source test per primitive.
 	if(!lib->sourceIsPoly)
 		lib->scanFuncPoly = lib->scanFuncFlat;
 }
 
 /*****************************************************************************/
 
-// The "can this batch draw at all" test (Maggie present, texture bound) used to
-// live here and ran per primitive; BeginDrawBatch() now rejects the whole call
-// up front.
+// The "can this batch draw at all" test (Maggie present, texture bound) lives in BeginDrawBatch(), not here.
 
 void DrawSpans(int miny, int maxy, MaggieBase *lib)
 {

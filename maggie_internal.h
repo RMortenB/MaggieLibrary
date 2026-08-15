@@ -28,14 +28,8 @@
 # define PROFILE 0
 #endif
 
-// PROFILE=1 is the coarse split: Frame / Clear / Spans (raster) / Setup (the
-// magDraw* CPU cost with the raster subtracted) plus its Trans/TexGen/Light
-// components, and per-primitive averages.
-//
-// PROFILE=2 adds the per-edge timer. Keep it off when you care about the
-// raster-vs-setup split: it calls GetClocks twice per edge, three edges per
-// triangle, which nearly doubles DrawEdge (42 -> 79 instructions) and inflates
-// both Lines and the Draw window that Setup is derived from.
+// PROFILE=1 is the coarse split: Frame / Clear / Spans (raster) / Setup (magDraw* minus the raster) with its Trans/TexGen/Light components, plus per-primitive averages.
+// PROFILE=2 adds the per-edge timer, which nearly doubles DrawEdge - keep it off when you care about the raster-vs-setup split.
 #define PROFILE_EDGES (PROFILE >= 2)
 
 /*****************************************************************************/
@@ -54,18 +48,8 @@
 
 /*****************************************************************************/
 
-// One scanline of the edge table. One fixed 32-byte layout for every draw mode -
-// affine and perspective share it, the affine modes simply never touch oowLeft.
-//
-// Field order is the order the span renderers read them, so a scanline is a
-// forward walk of the row and the optional fields (z, oow, iRight) sit at the
-// tail. Mirrored by STRUCTURE EPos in raster/raster_structs.i, which the asm
-// uses and a _Static_assert in maggie_draw.c pins to this layout.
-//
-// Only the two right-hand values the span code consumes exist: xPosRight for
-// the span end, and iRight for the non-planar intensity of a >3-vertex polygon.
-// The right column used to carry z/u/v/oow as well, written by every edge and
-// read by nothing.
+// One scanline of the edge table: one 32-byte layout for every draw mode, the optional fields (z, oow, iRight) at the tail in the order the span renderers read them.
+// Mirrored by STRUCTURE EPos in raster/raster_structs.i, which a _Static_assert in maggie_draw.c pins to this layout.
 
 typedef struct
 {
@@ -89,6 +73,21 @@ typedef struct
 	float zDDA;
 	float iDDA;
 } magGradients;
+
+/*****************************************************************************/
+
+// Maggie's own performance counters, a separate register block from MaggieRegs. Free-running memory-fetch counts, except pixels, which counts pixels STARTED - it includes pixels later killed by depth fail or alpha discard.
+// Read-only to the library, and sampled once per frame by magBeginScene/magEndScene under PROFILE so the overlay can report fetches per pixel.
+
+typedef struct
+{
+	ULONG texReads;			/* 0xdff300 | texture memory fetches */
+	ULONG depthReads;		/* 0xdff304 | depth buffer memory fetches */
+	ULONG screenReads;		/* 0xdff308 | screen dest memory fetches */
+	ULONG pixels;			/* 0xdff30c | pixels started */
+} MaggiePerfRegs;
+
+#define maggiePerf (*(volatile MaggiePerfRegs *)0xdff300)
 
 /*****************************************************************************/
 
@@ -119,8 +118,7 @@ typedef struct MaggieBase MaggieBase;
 
 /*****************************************************************************/
 
-// Per-batch bound rasterizer entry points. Both are resolved once per magDraw*
-// call from drawMode instead of being re-derived per primitive / per edge.
+// Per-batch bound rasterizer entry points, resolved once per magDraw* call from drawMode.
 
 typedef void (*magDrawLineFunc)(void *edge __asm("a0"),
 				const struct MaggieTransVertex *v0 __asm("a1"),
@@ -224,11 +222,7 @@ struct MaggieBase
 	ScissorRect scissor;
 	magEdgePos magEdge[MAGGIE_MAX_YRES];
 
-	// Per-polygon fan-sum gradients: written by ComputeGradients, read by the
-	// perspective+depth rasterizer via GetGradientsPtr. Placed right after
-	// magEdge so the hardcoded asm offsets (xres/screen/depth/scissor/edges
-	// = 100/104/108/456/472) stay put. Its own offset is guarded by a
-	// _Static_assert in maggie_draw.c against GetGradientsPtr in raster_structs.i.
+	// Per-polygon fan-sum gradients, read by the rasterizers via GetGradientsPtr. Kept right after magEdge so the hardcoded asm offsets ahead of it stay put; guarded by _Static_assert in maggie_draw.c.
 	magGradients gradients;
 
 	/*******************/
@@ -258,15 +252,8 @@ struct MaggieBase
 
 	/*******************/
 
-	// Per-primitive scratch shared with MaggieSetupTri (maggie_setuptri.s) and
-	// MaggieSetupPoly (maggie_setuppoly.s), which read cullSign and write the
-	// screen-y span. The offsets are hardcoded there as MB_* in
-	// raster/raster_structs.i and guarded by _Static_assert in maggie_draw.c -
-	// keep the two in lockstep.
-	//
-	// These sit AHEAD of the PROFILE block deliberately: everything below it moves
-	// when PROFILE is defined, which would make one set of MB_* offsets wrong for
-	// one of the two builds.
+	// Per-primitive scratch shared with MaggieSetupTri/MaggieSetupPoly, whose MB_* offsets in raster/raster_structs.i must stay in lockstep (guarded by _Static_assert in maggie_draw.c).
+	// These sit AHEAD of the PROFILE block deliberately: everything below it moves when PROFILE is defined.
 	float cullSign;					// -1.0f for MAG_DRAWMODE_CULL_CCW, else 1.0f
 	int primMinY;					// screen-y span of the primitive in flight
 	int primMaxY;
@@ -291,32 +278,23 @@ struct MaggieBase
 		ULONG clipIn;
 		ULONG clipPartial;
 
+		// Maggie's hardware counters: magStart is the frame-start snapshot, magDelta what the chipset did during the frame. Deltas are formed with unsigned
+		// subtraction, so a free-running counter that wraps mid-frame still reads correctly. All zero means the counters are not wired up in this core.
+		MaggiePerfRegs magStart;
+		MaggiePerfRegs magDelta;
+
 		ULONG count;
 	} profile;
 #endif
 	APTR dummyTextureData;
 
-	// Two-path rasterizer selection (C-side only, not read by asm):
-	// sourceIsPoly = the primitive being drawn came from magDrawIndexedPolygons.
-	// A >3-vertex polygon has non-planar Gouraud intensity that the fan-sum
-	// gradient can't represent, so it needs the per-scanline (…Poly) rasterizer.
-	// Triangles (and clipped-to-triangle polys, and clipped triangles that became
-	// polys) are planar -> flat path. See scanFuncFlat/scanFuncPoly below.
+	// The primitive in flight came from magDrawIndexedPolygons: >3 verts means non-planar intensity, which the fan-sum gradient can't represent, so it needs the …Poly rasterizer. Everything else is planar -> flat path.
 	int sourceIsPoly;
 
 	/*******************/
 
-	// Per-batch draw state. Resolved once per magDraw* call by BeginDrawBatch()
-	// and consumed by the per-primitive/per-edge path, which used to re-derive
-	// all of it from drawMode for every triangle and every edge.
-	// These live at the end of the struct on purpose: the asm rasterizers
-	// hardcode MaggieBase offsets up to and including gradients (52312), so
-	// nothing may be inserted ahead of it.
-	// Edge walkers for the two column sides. Which side a given edge feeds still
-	// depends on its direction (see DrawEdge), but the side now picks a *routine*
-	// rather than a base pointer +4 into an interleaved row: the left walker
-	// writes the left column's attributes, the right one writes only xPosRight
-	// (plus iRight for a polygon source). Both start at magEdge itself.
+	// Per-batch draw state, resolved once per magDraw* call by BeginDrawBatch(). Kept at the end of the struct: the asm hardcodes MaggieBase offsets up to and including gradients, so nothing may be inserted ahead of it.
+	// An edge's direction picks its walker, and the cull winding decides which column that is (see BeginDrawBatch): the left walker writes the left column's attributes, the right one only xPosRight (plus iRight for a polygon source). Both start at magEdge itself.
 	magDrawLineFunc edgeFuncDown;	// used when vtx0.y <= vtx1.y
 	magDrawLineFunc edgeFuncUp;		// used when vtx0.y >  vtx1.y
 	magScanFunc scanFunc;			// span renderer for the primitive in flight
@@ -337,8 +315,10 @@ typedef struct
 	UWORD	mode;				/* 18 | 16bit MODE (Bit0=Bilienar) (Bit1=Zbuffer) (Bit2=16bit output) */
 	UWORD	unused1;			/* 20 */
 	UWORD	modulo;				/* 22 | 16bit Destination Step */
-	ULONG	unused2;			/* 24 */
-	ULONG	unused3;			/* 28 */
+	// Second-order per-pixel delta registers (Maggie_uDeltaDelta/Maggie_vDeltaDelta in raster/raster_structs.i). The library has never written these, so they held
+	// whatever was last in them; if the chipset adds them per pixel then the effective dU/dV drift across every span away from the values the raster wrote.
+	ULONG	uDeltaDelta;		/* 24 */
+	ULONG	vDeltaDelta;		/* 28 */
 	ULONG	uCoord;				/* 32 | 32bit U (8:24 normalised) */
 	ULONG	vCoord;				/* 36 | 32bit V (8:24 normalised) */
 	LONG	uDelta;				/* 40 | 32bit dU (8:24 normalised) */
@@ -571,20 +551,14 @@ void SelectScanFunctions(MaggieBase *lib);
 
 /*****************************************************************************/
 
-// Per-triangle setup in maggie_setuptri.s: backface cull, screen-y span and the
-// five attribute gradients. Returns 0 to skip the triangle (backfacing, or zero
-// scanlines tall), else nonzero with lib->gradients / primMinY / primMaxY set.
-// Written in asm because the gradient block needs ~15 live float values and
-// GCC only knows fp0-fp7; the 68080's e0-e23 are outside the C ABI, so it needs
-// no register-save prologue at all.
+// Per-triangle setup in maggie_setuptri.s: backface cull, screen-y span and the five attribute gradients.
+// Returns 0 to skip the triangle (backfacing, or zero scanlines tall), else nonzero with lib->gradients / primMinY / primMaxY set.
 ULONG MaggieSetupTri(struct MaggieTransVertex *v0 __asm("a0"),
 				struct MaggieTransVertex *v1 __asm("a1"),
 				struct MaggieTransVertex *v2 __asm("a2"),
 				MaggieBase *lib __asm("a6"));
 
-// Per-polygon setup in maggie_setuppoly.s: the same job for an n-gon fan, with
-// the area/min-max pass fused into the gradient pass. indx may be NULL for a
-// contiguous fan. n must be >= 3 - the callers check that.
+// Per-polygon setup in maggie_setuppoly.s: the same job for an n-gon fan. indx may be NULL for a contiguous fan; n must be >= 3, which the callers check.
 ULONG MaggieSetupPoly(struct MaggieTransVertex *vtx __asm("a0"),
 				const UWORD *indx __asm("a1"),
 				int n __asm("d0"),
@@ -592,9 +566,7 @@ ULONG MaggieSetupPoly(struct MaggieTransVertex *vtx __asm("a0"),
 
 /*****************************************************************************/
 
-// Scanline edge DDAs, generated from raster/edge_walk.inc by maggie_edgewalk.s.
-// One is bound to lib->edgeFuncDown / lib->edgeFuncUp per batch, so each edge
-// stores exactly the columns its span renderer will read back:
+// Scanline edge DDAs, generated from raster/edge_walk.inc by maggie_edgewalk.s. One pair is bound to lib->edgeFuncDown / lib->edgeFuncUp per batch, so each edge stores exactly the columns its span renderer reads back:
 //
 //   Left …WZ  perspective + depth    x i u v z oow
 //   Left …W   perspective            x i u v   oow

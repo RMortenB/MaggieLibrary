@@ -8,19 +8,13 @@ void DrawPolygon1Pass(const magGradients *gradients, struct MaggieTransVertex *v
 float getBestDistance3(magGradients *res, const struct MaggieTransVertex *vtx);
 float getBestDistance(magGradients *res, const struct MaggieTransVertex *vtx, int nVerts);
 
-// The asm reaches into MaggieBase at hardcoded offsets (MB_* in
-// raster/raster_structs.i): the perspective+depth rasterizer reads gradients via
-// GetGradientsPtr, and MaggieSetupTri reads cullSign and writes primMinY/primMaxY.
-// Keep these in lockstep - a layout change must fail the build here, not corrupt
-// a field at runtime.
+// The asm reaches into MaggieBase at hardcoded offsets (MB_* in raster/raster_structs.i), so a layout change must fail the build here rather than corrupt a field at runtime.
 _Static_assert(__builtin_offsetof(MaggieBase, gradients) == 35032, "MB_gradients in raster/raster_structs.i is stale");
 _Static_assert(__builtin_offsetof(MaggieBase, cullSign) == 158314, "MB_cullSign in raster/raster_structs.i is stale");
 _Static_assert(__builtin_offsetof(MaggieBase, primMinY) == 158318, "MB_primMinY in raster/raster_structs.i is stale");
 _Static_assert(__builtin_offsetof(MaggieBase, primMaxY) == 158322, "MB_primMaxY in raster/raster_structs.i is stale");
 
-// The edge table's own layout is equally hardcoded: STRUCTURE EPos in
-// raster/raster_structs.i, read by the span renderers and written by the edge
-// walkers in maggie_edgewalk.s. Field order is the span renderers' read order.
+// The edge table's layout is equally hardcoded: STRUCTURE EPos in raster/raster_structs.i, written by the edge walkers and read by the span renderers.
 _Static_assert(sizeof(magEdgePos) == 32, "EPos_Size in raster/raster_structs.i is stale");
 _Static_assert(__builtin_offsetof(magEdgePos, xPosLeft) == 0, "EPos_xPosLeft is stale");
 _Static_assert(__builtin_offsetof(magEdgePos, xPosRight) == 4, "EPos_xPosRight is stale");
@@ -66,6 +60,11 @@ static void SetupHW(MaggieBase *lib)
 	}
 	maggieRegs.mode = drawMode;
 	maggieRegs.modulo = modulo;
+
+	// Zero the second-order deltas once per batch: registers hold their value, and the library has otherwise never set them. Left uninitialised they add a stale
+	// per-pixel term to u and v, which would move the deltas the chipset actually uses away from the ones the raster wrote.
+	maggieRegs.uDeltaDelta = 0;
+	maggieRegs.vDeltaDelta = 0;
 	maggieRegs.lightRGBA = lib->colour;
 
 	APTR txtrData = GetTextureData(lib->textures[lib->txtrIndex]);
@@ -85,9 +84,7 @@ static void SetupHW(MaggieBase *lib)
 
 /*****************************************************************************/
 
-// A batch with no Maggie or no bound texture rasterizes nothing, so reject it
-// before transforming/lighting/clipping anything. This test used to sit in
-// DrawSpans and ran once per primitive.
+// A batch with no Maggie or no bound texture rasterizes nothing, so reject it before transforming/lighting/clipping anything.
 
 static int CanDraw(MaggieBase *lib)
 {
@@ -98,9 +95,7 @@ static int CanDraw(MaggieBase *lib)
 
 /*****************************************************************************/
 
-// Hoist everything that depends only on drawMode / the bound texture out of the
-// per-primitive and per-edge path. Called once per magDraw* call, right where
-// SetupHW() used to be.
+// Hoists everything that depends only on drawMode / the bound texture out of the per-primitive and per-edge path. Called once per magDraw* call.
 
 static void BeginDrawBatch(MaggieBase *lib)
 {
@@ -108,12 +103,7 @@ static void BeginDrawBatch(MaggieBase *lib)
 
 	UWORD mode = lib->drawMode;
 
-	// Pick the pair of edge walkers this batch needs. Each writes exactly the
-	// columns its span renderer reads back: the left one drops oow when the
-	// mapping is affine and z when there is no depth buffer, and the right one
-	// carries iRight only for a polygon source, since sourceIsPoly is what
-	// decides whether the …Poly span renderers - iRight's only readers - are
-	// reachable at all (see SelectScanFunctions).
+	// Pick the pair of edge walkers this batch needs: the left one drops oow when the mapping is affine and z when there is no depth buffer, and the right one carries iRight only for a polygon source, the only case where the …Poly span renderers are reachable.
 	magDrawLineFunc left;
 	magDrawLineFunc right;
 
@@ -153,11 +143,7 @@ static void BeginDrawBatch(MaggieBase *lib)
 /*****************************************************************************/
 /*****************************************************************************/
 
-// The per-polygon gradient maths - the fan-sum described in MaggieSetupPoly -
-// now lives entirely in asm: maggie_setuptri.s for triangles, maggie_setuppoly.s
-// for n-gons. Both files carry the derivation and the numerical notes (why the
-// reciprocal is applied after the cancellation, and why the two routines need
-// opposite signs for it).
+// The per-polygon gradient maths lives in asm: maggie_setuptri.s for triangles, maggie_setuppoly.s for n-gons, which also carry the sign and precision notes.
 
 /*****************************************************************************/
 
@@ -282,9 +268,7 @@ static void NormaliseClippedVertexBuffer(struct MaggieTransVertex *vtx, int nVer
 
 /*****************************************************************************/
 
-// Cull, screen-y span and the five attribute gradients all live in
-// MaggieSetupTri (maggie_setuptri.s) - see the note on its prototype for why.
-// 3 verts are always planar in intensity, so scanFunc stays scanFuncFlat.
+// Cull, screen-y span and the five attribute gradients all live in MaggieSetupTri (maggie_setuptri.s). 3 verts are always planar in intensity, so scanFunc stays scanFuncFlat.
 
 static void DrawTriangle(struct MaggieTransVertex *vtx0, struct MaggieTransVertex *vtx1, struct MaggieTransVertex *vtx2, MaggieBase *lib)
 {
@@ -298,11 +282,9 @@ static void DrawTriangle(struct MaggieTransVertex *vtx0, struct MaggieTransVerte
 	DrawEdge(vtx2, vtx0, miny, lib);
 	DrawSpans(miny, lib->primMaxY, lib);
 }
-
 /*****************************************************************************/
 
-// Cull, screen-y span and the five attribute gradients all live in
-// MaggieSetupPoly (maggie_setuppoly.s) - see the note on its prototype.
+// Cull, screen-y span and the five attribute gradients all live in MaggieSetupPoly (maggie_setuppoly.s).
 
 static void DrawPolygon(struct MaggieTransVertex *vtx, int nVerts, MaggieBase *lib)
 {
@@ -556,8 +538,7 @@ void magDrawIndexedTriangles(REG(d0, UWORD startVtx), REG(d1, UWORD nVerts), REG
 		return;
 	}
 
-	// Lighting and texgen run after the clip test so a fully off-screen batch
-	// pays for neither (magDrawTriangles/magDrawIndexedPolygons already did).
+	// Lighting and texgen run after the clip test so a fully off-screen batch pays for neither.
 	if(lib->drawMode & MAG_DRAWMODE_LIGHTING)
 	{
 		LightBuffer(vbMem, startVtx, nVerts, lib);
@@ -567,8 +548,7 @@ void magDrawIndexedTriangles(REG(d0, UWORD startVtx), REG(d1, UWORD nVerts), REG
 
 	BeginDrawBatch(lib);
 
-	// Hoisted: DrawTriangle takes lib, so the compiler has to assume the call may
-	// have rewritten vbMem->transVerts and reloads it on every iteration.
+	// Hoisted: DrawTriangle takes lib, so the compiler assumes the call may have rewritten vbMem->transVerts and reloads it every iteration.
 	struct MaggieTransVertex *transVerts = vbMem->transVerts;
 
 	if(clipRes == CLIPPED_IN)

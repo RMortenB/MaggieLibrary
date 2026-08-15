@@ -11,26 +11,12 @@
 		FLOAT TransVtx_I
 		LONG TransVtx_Size
 
-; One scanline of the edge table: 32 bytes, one fixed layout for every draw
-; mode. Mirrored by magEdgePos in maggie_internal.h, which a _Static_assert in
-; maggie_draw.c pins to these offsets.
-;
-; The field order is the order the span renderers READ them, so a scanline walks
-; the row forward and the prefetch follows. Only the two right-hand values the
-; span code actually consumes are stored - xPosRight for the span end and iRight
-; for non-planar intensity. There is no right-hand z/u/v/oow: nothing ever read
-; them.
-;
-; The tail fields are the optional ones, so every variant reads a prefix of the
-; row plus, at most, iRight:
+; One scanline of the edge table: 32 bytes, one layout for every draw mode. Mirrored by magEdgePos in maggie_internal.h, offsets pinned by _Static_assert in maggie_draw.c.
+; Field order is the order the span renderers read them, so every variant reads a prefix of the row plus, at most, iRight:
 ;
 ;   affine                  0..16          affine + depth        0..20
 ;   perspective             0..16, 24      perspective + depth    0..24
 ;   ...Poly variants add iRight at 28.
-;
-; z before oow puts affine+depth - the mode picked for speed - on a contiguous
-; prefix, at the cost of one skipped word in perspective-without-depth. Swap the
-; two if that ever measures the other way round.
 	STRUCTURE EPos,0
 		FLOAT EPos_xPosLeft		; 0  | every variant
 		FLOAT EPos_xPosRight	; 4  | every variant
@@ -100,11 +86,7 @@ GetGradientsPtr MACRO
 	lea		MB_gradients(a6),\1
 ENDM
 
-; MaggieBase fields the asm reaches directly. Every one of these is guarded by a
-; _Static_assert in maggie_draw.c - if the struct layout moves, the C build fails
-; rather than the asm silently reading the wrong field. All of them sit ahead of
-; the #if PROFILE block in the struct, so one set of offsets is correct for both
-; the normal and the PROFILE=1 build.
+; MaggieBase fields the asm reaches directly, each guarded by a _Static_assert in maggie_draw.c. All sit ahead of the struct's #if PROFILE block, so these offsets hold for both builds.
 MB_gradients	EQU	35032
 MB_cullSign	EQU	158314
 MB_primMinY	EQU	158318

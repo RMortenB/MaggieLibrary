@@ -486,6 +486,11 @@ void magBeginScene(REG(a6, MaggieBase *lib))
 	lib->colour = 0x00ffffff;
 #if PROFILE
 	memset(&lib->profile, 0, sizeof(lib->profile));
+	// Snapshot after the memset, which would otherwise zero it, and before the frame timer starts so the four register reads land outside the measured window.
+	lib->profile.magStart.texReads = maggiePerf.texReads;
+	lib->profile.magStart.depthReads = maggiePerf.depthReads;
+	lib->profile.magStart.screenReads = maggiePerf.screenReads;
+	lib->profile.magStart.pixels = maggiePerf.pixels;
 	lib->profile.frame = GetClocks();
 #endif
 }
@@ -497,12 +502,15 @@ void magEndScene(REG(a6, MaggieBase *lib))
 	struct ExecBase *SysBase = lib->sysBase;
 #if PROFILE
 	lib->profile.frame = GetClocks() - lib->profile.frame;
+
+	lib->profile.magDelta.texReads = maggiePerf.texReads - lib->profile.magStart.texReads;
+	lib->profile.magDelta.depthReads = maggiePerf.depthReads - lib->profile.magStart.depthReads;
+	lib->profile.magDelta.screenReads = maggiePerf.screenReads - lib->profile.magStart.screenReads;
+	lib->profile.magDelta.pixels = maggiePerf.pixels - lib->profile.magStart.pixels;
+
 	if(lib->profile.frame)
 	{
-		// `draw` is the whole magDraw* window, so it already contains `spans`
-		// (and trans/texgen/light). The number worth looking at is the
-		// difference: Spans is what the rasterizer costs, Setup is what the CPU
-		// costs to feed it.
+		// `draw` is the whole magDraw* window and already contains `spans` (and trans/texgen/light), so the number worth looking at is the difference: Spans is the rasterizer, Setup is the CPU cost of feeding it.
 		ULONG spans = lib->profile.spans;
 		ULONG setup = (lib->profile.draw > spans) ? lib->profile.draw - spans : 0;
 
@@ -522,9 +530,31 @@ void magEndScene(REG(a6, MaggieBase *lib))
 		TextOut(lib, "ClipOut: %d", lib->profile.clipOut);
 		TextOut(lib, "ClipIn : %d", lib->profile.clipIn);
 		TextOut(lib, "ClipPar: %d", lib->profile.clipPartial);
+
+		// Maggie's own counters, in memory fetches. Per started pixel is the figure to compare between projects: it normalises out how much geometry a frame had,
+		// leaving the cost of feeding one pixel. Texture is the one the layout moves - a wide, short cache footprint gets no reuse from the previous scanline when
+		// the texture-space step runs down v, so this number rises with how diagonal the geometry is. Depth and screen should stay flat by comparison.
+		ULONG magPixels = lib->profile.magDelta.pixels;
+		if(magPixels)
+		{
+			TextOut(lib, "MagPix : %d", magPixels);
+			TextOut(lib, "MagTex : %d - %f/pix", lib->profile.magDelta.texReads, (double)lib->profile.magDelta.texReads / (double)magPixels);
+			TextOut(lib, "MagZ   : %d - %f/pix", lib->profile.magDelta.depthReads, (double)lib->profile.magDelta.depthReads / (double)magPixels);
+			TextOut(lib, "MagDst : %d - %f/pix", lib->profile.magDelta.screenReads, (double)lib->profile.magDelta.screenReads / (double)magPixels);
+		}
+		else if(lib->profile.magDelta.texReads | lib->profile.magDelta.depthReads | lib->profile.magDelta.screenReads)
+		{
+			// Fetches but no pixel count: the pixel counter is dead, so nothing can be normalised. Show the raw fetches rather than silently dividing by zero.
+			TextOut(lib, "MagTex : %d (no pixel count)", lib->profile.magDelta.texReads);
+			TextOut(lib, "MagZ   : %d", lib->profile.magDelta.depthReads);
+			TextOut(lib, "MagDst : %d", lib->profile.magDelta.screenReads);
+		}
+		else
+		{
+			TextOut(lib, "MagCnt : idle - $dff300 not wired?");
+		}
 #if PROFILE_EDGES
-		// Only meaningful in isolation: the timers that produce these also
-		// inflate Setup above, since DrawEdge nearly doubles in size.
+		// Only meaningful in isolation: the timers that produce these also inflate Setup above, since DrawEdge nearly doubles in size.
 		TextOut(lib, "Lines  : %d - %d%%", lib->profile.lines, lib->profile.lines * 100 / lib->profile.frame);
 		if(lib->profile.nLinePixels)
 			TextOut(lib, "Line time per pixel %d (%d)", lib->profile.lines / lib->profile.nLinePixels, lib->profile.nLinePixels);

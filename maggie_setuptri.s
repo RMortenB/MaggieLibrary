@@ -9,64 +9,21 @@
 ;                      struct MaggieTransVertex *v2 __asm("a2"),
 ;                      MaggieBase *lib             __asm("a6"));
 ;
-; Per-triangle setup: backface cull, screen-y span, and the five per-polygon
-; attribute gradients.
+; Per-triangle setup: backface cull, screen-y span, and the five per-polygon attribute gradients.
 ;
 ;   returns 0  -> skip this triangle (backfacing, or zero scanlines tall)
-;   returns 1  -> draw it; lib->gradients, lib->primMinY and lib->primMaxY
-;                 have been written
+;   returns 1  -> draw it; lib->gradients, lib->primMinY and lib->primMaxY have been written
 ;
 ; The caller still emits the three edges and dispatches the span renderer.
+; Asm because the gradient block wants ~15 live floats: GCC only knows fp0-fp7 and spills, while e0-e23 are invisible to the C ABI and cost no prologue.
 ;
-; Why this is asm: the gradient block wants ~15 live float values at once. GCC
-; only knows fp0-fp7, so it shuffles a third of them through the integer
-; registers and saves d2-d7/a2-a6 + fp2-fp7 on entry - 116 bytes of stack
-; traffic each way, on every triangle including the ~half that get culled.
-; e0-e23 are invisible to the C ABI: using them costs no prologue, nothing ends
-; up homeless, and there are enough registers to schedule around the latencies.
-;
-;------------------------------------------------------------------------------
-; SCHEDULING
-;
-; FP instructions are not fused: one issues per cycle, results land ~6 cycles
-; later (~10 for fdiv), issue is in-order, and the CPU stalls only when an
-; operand is not ready. What matters is therefore how many independent
-; instructions sit between each producer and its consumer, and the order below
-; is chosen for that rather than for readability.
-;
-; Four things drive the layout:
-;
-;  1. The cull is one long chain - delta, product, difference, sign - about 5
-;     deep, so ~30 cycles in which only ~13 instructions have anything to do.
-;     Anything independent parked in those slots is free, INCLUDING on the
-;     culled path, because those cycles were stalls either way. The y
-;     truncations, the cullSign load, v0's five attributes and all ten attribute
-;     deltas go there.
-;
-;  2. The five attribute gradients are five independent chains. Each gets its
-;     own pair of temps and they are issued stage by stage - all five deltas,
-;     then all five *dy2, and so on - which leaves four independent instructions
-;     between every producer and consumer. Sharing one pair of temps across the
-;     five chains, the obvious way to write it, serializes them into five
-;     ~26-cycle chains and costs ~90 cycles more.
-;
-;  3. The screen-y span uses integer compares rather than fcmp/fbcc. Four FPU
-;     compare-and-branch pairs cost ~30 cycles of pure stall, and the truncated
-;     integers are wanted anyway. Integer compares also work on CCR, not FPCC,
-;     so they slot into the FP stalls without disturbing the cull's pending
-;     ftst - that is what lets the whole span block sit between ftst and fbgt.
-;
-;  4. Both long-latency results are started as early as their inputs allow and
-;     consumed as late as possible: the reciprocal's -1.0 numerator is loaded up
-;     front so the fdiv never waits on it, the fdiv is issued before the three
-;     multiply stages that do not depend on it, and each compare is separated
-;     from its branch by independent work.
+; Instruction order is scheduled, not readable: one FP issue per cycle, results ~6 cycles later (~10 for fdiv), in-order, stalling only on an unready operand.
+; So independent work is parked in the cull chain's stalls, the five gradient chains get their own temps and are issued stage by stage, and the y span uses integer compares so it fits inside the FPU compare latencies.
 ;------------------------------------------------------------------------------
 ; REGISTERS
 ;   e0,e1,e2   y0,y1,y2, truncated in place
 ;   e3         x0, dead once both x deltas are formed
-;   e4,e5      dx1,dx2, then recycled as the intensity chain's temps (operands
-;              are read at issue and issue is in-order, so this is safe)
+;   e4,e5      dx1,dx2, then recycled as the intensity chain's temps (safe: operands are read at issue, in-order)
 ;   e6,e7      dy1,dy2, live until the last numerator
 ;   e8         p1 -> denom, live until the reciprocal
 ;   e9         p2
@@ -76,9 +33,7 @@
 ;   fp0        cullSign, then area
 ;   d0,d1,d2   iy0,iy1,iy2 -> min in d0, max in d1
 ;
-; Clobbers d0/d1/d2 (d2 saved) and e0-e23. fp0 is used for the cull compare
-; (caller-saved). fp1-fp7 and every callee-saved integer register other than the
-; saved d2/a2 are left untouched.
+; Clobbers d0/d1/d2 (d2 saved) and e0-e23; fp0 is the cull compare (caller-saved), fp1-fp7 and the other callee-saved registers are untouched.
 ;------------------------------------------------------------------------------
 
 _MaggieSetupTri:
@@ -94,8 +49,7 @@ _MaggieSetupTri:
 	fmove.s	TransVtx_PosX(a2),e5
 
 ;--- the cull chain, with its stalls filled ------------------------------------
-; One cross product serves as both the cull area and the gradient denominator -
-; they are the same quantity.
+; One cross product serves as both the cull area and the gradient denominator.
 
 	fsub	e0,e1,e6		; dy1 = y1 - y0
 	fsub	e0,e2,e7		; dy2 = y2 - y0
@@ -116,19 +70,9 @@ _MaggieSetupTri:
 	fmul	e6,e5,e9		; p2 = dx2 * dy1
 
 ;--- attribute deltas ----------------------------------------------------------
-; Both deltas per attribute are formed NEGATED, as (f0 - f1) and (f0 - f2), so
-; each fuses its load and subtract into one fsub.s <ea>,eSrc,eDst - two fewer
-; instructions per attribute, and no register is needed for f1/f2 at all. The
-; doubly-negated result is corrected by the negated reciprocal. Every step is an
-; exact IEEE negation, so the stored gradient matches the straightforward form
-; bit-for-bit (checked over 2M random and adversarial inputs) with one
-; exception: when the gradient is exactly zero the sign of that zero can differ,
-; which the DDA cannot observe - adding -0.0 and +0.0 to a finite value gives
-; the same result.
-;
-; These sit here, ahead of the cull's ftst, purely as filler for the area
-; multiply's latency. e4/e5 are recycled here from dx1/dx2, whose only readers
-; were the two products issued above.
+; Both deltas per attribute are formed NEGATED, as (f0 - f1) and (f0 - f2), so the load fuses into one fsub.s <ea>,eSrc,eDst; the negated reciprocal corrects it.
+; Bit-exact against the straightforward form except for the sign of an exact zero, which the DDA cannot observe.
+; They sit ahead of the cull's ftst purely as filler for the area multiply's latency; e4/e5 are recycled from dx1/dx2.
 
 	fsub.s	TransVtx_PosW(a1),e10,e16
 	fsub.s	TransVtx_PosW(a2),e10,e17
@@ -150,10 +94,8 @@ _MaggieSetupTri:
 	fmul	e8,fp0			; area = denom * cullSign
 
 ;--- screen-y span, in integer -------------------------------------------------
-; Truncation is monotonic, so min(trunc(y)) == trunc(min(y)) and this matches
-; the C version exactly. Sitting between ftst and its fbgt is deliberate: these
-; are CCR compares and cannot disturb the pending FPCC, so they cover the ftst
-; latency for free.
+; Truncation is monotonic, so min(trunc(y)) == trunc(min(y)), matching the C exactly.
+; Sitting between ftst and its fbgt is deliberate: CCR compares cannot disturb the pending FPCC, so they cover the ftst latency for free.
 
 	cmp.l	d1,d0
 	ble.s	.sorted
@@ -180,37 +122,17 @@ _MaggieSetupTri:
 	fbgt	.skip			; backfacing
 
 ;--- the reciprocal, and the stages that do not need it ------------------------
-; area is the cull-signed fan area, so it is <= 0 here and the old two-sided
-; epsilon test collapses to one compare. A zero scale zeroes every gradient,
-; which is what the C stored explicitly for a degenerate triangle. The fdiv
-; cannot be hoisted above this test: denom is exactly 0 for a fully degenerate
-; triangle, which survives the cull, and dividing by it would trap on any host
-; that has FPU exceptions enabled.
-;
-; Scale by the reciprocal only AFTER the subtraction. Folding it into dy1/dy2
-; up front would save five multiplies but costs up to 0.4% relative error on
-; sliver triangles, where the subtraction cancels heavily.
-
-; The * dy2 stage MUST stay ahead of the compare. FP arithmetic sets the FPCC
-; from its result, so scheduling these between the fcmp and the fbgt - which is
-; what they used to do, to cover the compare's latency - made the branch test the
-; sign of (i0-i1)*dy2 instead of the area. Ordinary triangles then took
-; .degenerate, e15 became 0, all five gradients became 0, and the span renderer
-; produced uDelta = vDelta = 0: one texel smeared across the span.
-;
-; Nothing may be placed between the fcmp and the fbgt unless it leaves the FPCC
-; alone (integer instructions are fine - that is why the cull's ftst/fbgt pair
-; above still works with the y-span block inside it).
+; area is cull-signed, so it is <= 0 here and the epsilon test is one compare; a zero scale zeroes every gradient, as the C did for a degenerate triangle.
+; The fdiv cannot be hoisted above the test: a fully degenerate triangle survives the cull with denom exactly 0, which would trap where FPU exceptions are enabled.
+; Scale by the reciprocal only AFTER the subtraction - folding it into dy1/dy2 saves five multiplies but costs up to 0.4% relative error on slivers.
+; The * dy2 stage MUST stay ahead of the fcmp: FP arithmetic sets the FPCC from its result, so nothing but integer instructions may sit between the fcmp and the fbgt.
 	fmul	e7,e16			; * dy2
 	fmul	e7,e18
 	fmul	e7,e20
 	fmul	e7,e22
 	fmul	e7,e4
 
-; The epsilon MUST be written as a hex bit pattern. vasm mis-assembles decimal
-; float immediates without a diagnostic - "#-1e-6" emits -0.0, which would make
-; this "fp0 > 0", always false after the cull, silently removing the guard and
-; letting the fdiv divide by a zero denom.
+; The epsilon MUST be a hex bit pattern: vasm silently assembles "#-1e-6" as -0.0, which would remove the guard and let the fdiv see a zero denom.
 	fcmp.s	#$B58637BD,fp0		; -1e-6
 	fbgt	.degenerate
 	fdiv	e8,e15			; -1.0 / denom
@@ -220,8 +142,7 @@ _MaggieSetupTri:
 .scaled:
 
 ;--- the remaining stages ------------------------------------------------------
-; Intensity used fsub.l above - a signed long operand, matching the (float)(int)
-; cast in C. It is clamped to 0..0xffff upstream, so the sign bit is never set.
+; Intensity used fsub.l above - a signed long, matching the (float)(int) cast in C; it is clamped to 0..0xffff upstream.
 
 	fmul	e6,e17			; * dy1
 	fmul	e6,e19
