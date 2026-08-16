@@ -165,6 +165,55 @@ static UBYTE ClipCode(const vec4 *v)
 
 /*****************************************************************************/
 
+// The two z bits of a clip code. Neither may be relaxed: NormaliseClippedVertexBuffer divides by w, which the near plane is what keeps positive, and a z past the far plane
+// overflows the span renderers' fixed-point depth conversion (fsub.s #$4f000000 then fmove.l) rather than saturating.
+#define CLIP_NEARFAR	0x30
+
+// Guard band, in units of w. A primitive that leaves the frustum only sideways needs no geometric clip: the span renderers clamp each scanline's x to the scissor and
+// pre-step the attributes from the clamped start, and the setup clamps the y span while DrawEdge walks only the rows that survive it. The band exists to bound how far out
+// that may go - xPosLeft reaches the raster through fmove.l, and MaggieSetupTri's denom loses relative precision as the coordinates grow, worst on slivers.
+#define GUARD_BAND	2.0f
+
+// Valid only once CLIP_NEARFAR is clear for the whole primitive, which is what makes w positive. A w that is somehow still negative fails both compares and takes the clipper.
+static int InsideGuardBand(const vec4 *v)
+{
+	float guard = GUARD_BAND * v->w;
+
+	return (v->x >= -guard) && (v->x <= guard) && (v->y >= -guard) && (v->y <= guard);
+}
+
+/*****************************************************************************/
+
+// Replaces "any clip code set -> clip it" with "any clip code the guard band cannot absorb -> clip it". Called only for primitives that already have a code set, so the
+// extra compares stay off the path everything wholly inside takes.
+
+static int NeedsClipping(const struct MaggieTransVertex *vtx, int nVerts, int anyCode, MaggieBase *lib)
+{
+	int needed = 1;
+
+	if(!(anyCode & CLIP_NEARFAR))
+	{
+		needed = 0;
+		for(int i = 0; i < nVerts; ++i)
+		{
+			if(!InsideGuardBand(&vtx[i].pos))
+			{
+				needed = 1;
+				break;
+			}
+		}
+	}
+#if PROFILE
+	if(needed)
+		lib->profile.clipPrims++;
+	else
+		lib->profile.guardPrims++;
+#endif
+	return needed;
+}
+
+/*****************************************************************************/
+
 static int ComputeClipCodes(UBYTE *clipCodes, struct MaggieTransVertex *vtx, UWORD nVerts)
 {
 	UBYTE out = ~0;
@@ -472,23 +521,26 @@ void magDrawTriangles(REG(d0, UWORD startVtx), REG(d1, UWORD nVerts), REG(a6, Ma
 	{
 		for(int i = 0; i < nVerts; i += 3)
 		{
-			if(vbMem->clipCodes[i + 0] | vbMem->clipCodes[i + 1] | vbMem->clipCodes[i + 2])
+			if(vbMem->clipCodes[i + 0] & vbMem->clipCodes[i + 1] & vbMem->clipCodes[i + 2])
+				continue;
+
+			int anyCode = vbMem->clipCodes[i + 0] | vbMem->clipCodes[i + 1] | vbMem->clipCodes[i + 2];
+
+			if(anyCode && NeedsClipping(&vbMem->transVerts[i], 3, anyCode, lib))
 			{
-				if(!(vbMem->clipCodes[i + 0] & vbMem->clipCodes[i + 1] & vbMem->clipCodes[i + 2]))
+				clippedPoly[0] = vbMem->transVerts[i + 0];
+				clippedPoly[1] = vbMem->transVerts[i + 1];
+				clippedPoly[2] = vbMem->transVerts[i + 2];
+				int nClippedVerts = ClipPolygon(clippedPoly, 3);
+				if(nClippedVerts > 2)
 				{
-					clippedPoly[0] = vbMem->transVerts[i + 0];
-					clippedPoly[1] = vbMem->transVerts[i + 1];
-					clippedPoly[2] = vbMem->transVerts[i + 2];
-					int nClippedVerts = ClipPolygon(clippedPoly, 3);
-					if(nClippedVerts > 2)
-					{
-						NormaliseClippedVertexBuffer(clippedPoly, nClippedVerts, lib);
-						DrawPolygon(clippedPoly, nClippedVerts, lib);
-					}
+					NormaliseClippedVertexBuffer(clippedPoly, nClippedVerts, lib);
+					DrawPolygon(clippedPoly, nClippedVerts, lib);
 				}
 			}
 			else
 			{
+				// Also the guard band's path: these are non-indexed verts, so normalising in place cannot be seen by another triangle.
 				NormaliseClippedVertexBuffer(&vbMem->transVerts[i], 3, lib);
 				DrawTriangle(&vbMem->transVerts[i + 0], &vbMem->transVerts[i + 1], &vbMem->transVerts[i + 2], lib);
 			}
@@ -601,7 +653,8 @@ void magDrawIndexedTriangles(REG(d0, UWORD startVtx), REG(d1, UWORD nVerts), REG
 				clippedPoly[0] = transVerts[i0];
 				clippedPoly[1] = transVerts[i1];
 				clippedPoly[2] = transVerts[i2];
-				if(vbMem->clipCodes[i0] | vbMem->clipCodes[i1] | vbMem->clipCodes[i2])
+				int anyCode = vbMem->clipCodes[i0] | vbMem->clipCodes[i1] | vbMem->clipCodes[i2];
+				if(anyCode && NeedsClipping(clippedPoly, 3, anyCode, lib))
 				{
 					int nClippedVerts = ClipPolygon(clippedPoly, 3);
 					if(nClippedVerts > 2)
@@ -720,16 +773,12 @@ void magDrawIndexedPolygons(REG(d0, UWORD startVtx), REG(d1, UWORD nVerts), REG(
 				clippedPoly[i] = transVtx[indexBuffer[i + indxPos]];
 			}
 			indxPos += nPolyVerts + 1;
-			if(clippedAny)
+			// One tail for both: the guard band's path is the old clippedAny == 0 path, which already knew nPolyVerts >= 3.
+			if(clippedAny && NeedsClipping(clippedPoly, nPolyVerts, clippedAny, lib))
 			{
 				nPolyVerts = ClipPolygon(clippedPoly, nPolyVerts);
-				if(nPolyVerts > 2)
-				{
-					NormaliseClippedVertexBuffer(clippedPoly, nPolyVerts, lib);
-					DrawPolygon(clippedPoly, nPolyVerts, lib);
-				}
 			}
-			else
+			if(nPolyVerts > 2)
 			{
 				NormaliseClippedVertexBuffer(clippedPoly, nPolyVerts, lib);
 				DrawPolygon(clippedPoly, nPolyVerts, lib);

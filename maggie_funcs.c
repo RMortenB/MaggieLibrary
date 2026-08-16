@@ -530,6 +530,9 @@ void magEndScene(REG(a6, MaggieBase *lib))
 		TextOut(lib, "ClipOut: %d", lib->profile.clipOut);
 		TextOut(lib, "ClipIn : %d", lib->profile.clipIn);
 		TextOut(lib, "ClipPar: %d", lib->profile.clipPartial);
+		// Per primitive, not per batch: Guarded is what the guard band saved, so Guarded / (ClipPrm + Guarded) is the fraction of straddling primitives that stayed on the fast path.
+		TextOut(lib, "ClipPrm: %d", lib->profile.clipPrims);
+		TextOut(lib, "Guarded: %d", lib->profile.guardPrims);
 
 		// Maggie's own counters, in memory fetches. Per started pixel is the figure to compare between projects: it normalises out how much geometry a frame had,
 		// leaving the cost of feeding one pixel. Texture is the one the layout moves - a wide, short cache footprint gets no reuse from the previous scanline when

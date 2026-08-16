@@ -278,6 +278,10 @@ struct MaggieBase
 		ULONG clipIn;
 		ULONG clipPartial;
 
+		// Per-primitive, unlike the three batch counters above. clipPrims went to ClipPolygon; guardPrims had a clip code but the guard band absorbed it, so clipPrims + guardPrims is what a build without the band would have clipped.
+		ULONG clipPrims;
+		ULONG guardPrims;
+
 		// Maggie's hardware counters: magStart is the frame-start snapshot, magDelta what the chipset did during the frame. Deltas are formed with unsigned
 		// subtraction, so a free-running counter that wraps mid-frame still reads correctly. All zero means the counters are not wired up in this core.
 		MaggiePerfRegs magStart;
