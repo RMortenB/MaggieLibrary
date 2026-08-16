@@ -12,8 +12,8 @@
 ; Per-polygon setup: fan-sum area (which is also the gradient denominator), screen-y span, and the five attribute gradients.
 ; indx may be NULL for a contiguous fan; n must be >= 3, which the caller already checks.
 ;
-;   returns 0  -> skip this polygon (backfacing, or zero scanlines tall)
-;   returns 1  -> draw it; lib->gradients, lib->primMinY and lib->primMaxY have been written
+;   returns 0  -> skip this polygon (backfacing, zero scanlines tall, or wholly outside the scissor)
+;   returns 1  -> draw it; lib->gradients and the scissor-clamped lib->primMinY / lib->primMaxY have been written
 ;
 ; The caller still emits the edges and dispatches the span renderer.
 ;
@@ -250,8 +250,17 @@ _MaggieSetupPoly:
 	fmul	e7,fp0			; area = denom * cullSign
 	fmove.w	#1,e13			; the reciprocal's numerator
 
+; Clamped here rather than at the span renderer: DrawEdge indexes the edge table from primMinY, so both ends must be rows that will actually be painted.
+	cmp.l	MB_scissorY0(a6),d1
+	bge.s	.minInside
+	move.l	MB_scissorY0(a6),d1
+.minInside:
+	cmp.l	MB_scissorY1(a6),d2
+	ble.s	.maxInside
+	move.l	MB_scissorY1(a6),d2
+.maxInside:
 	cmp.l	d2,d1
-	beq.w	.skip			; zero scanlines tall
+	bge.w	.skip			; zero scanlines tall, or wholly outside the scissor
 
 	move.l	d1,MB_primMinY(a6)
 	move.l	d2,MB_primMaxY(a6)

@@ -11,8 +11,8 @@
 ;
 ; Per-triangle setup: backface cull, screen-y span, and the five per-polygon attribute gradients.
 ;
-;   returns 0  -> skip this triangle (backfacing, or zero scanlines tall)
-;   returns 1  -> draw it; lib->gradients, lib->primMinY and lib->primMaxY have been written
+;   returns 0  -> skip this triangle (backfacing, zero scanlines tall, or wholly outside the scissor)
+;   returns 1  -> draw it; lib->gradients and the scissor-clamped lib->primMinY / lib->primMaxY have been written
 ;
 ; The caller still emits the three edges and dispatches the span renderer.
 ; Asm because the gradient block wants ~15 live floats: GCC only knows fp0-fp7 and spills, while e0-e23 are invisible to the C ABI and cost no prologue.
@@ -113,8 +113,17 @@ _MaggieSetupTri:
 	bge.s	.gotMax
 	move.l	d2,d1
 .gotMax:
+; Clamped here rather than at the span renderer: DrawEdge indexes the edge table from primMinY, so both ends must be rows that will actually be painted. Integer only, so the pending FPCC survives.
+	cmp.l	MB_scissorY0(a6),d0
+	bge.s	.minInside
+	move.l	MB_scissorY0(a6),d0
+.minInside:
+	cmp.l	MB_scissorY1(a6),d1
+	ble.s	.maxInside
+	move.l	MB_scissorY1(a6),d1
+.maxInside:
 	cmp.l	d1,d0
-	beq.w	.skip			; zero scanlines tall
+	bge.w	.skip			; zero scanlines tall, or wholly outside the scissor
 
 	move.l	d0,MB_primMinY(a6)
 	move.l	d1,MB_primMaxY(a6)

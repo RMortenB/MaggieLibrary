@@ -552,7 +552,7 @@ void SelectScanFunctions(MaggieBase *lib);
 /*****************************************************************************/
 
 // Per-triangle setup in maggie_setuptri.s: backface cull, screen-y span and the five attribute gradients.
-// Returns 0 to skip the triangle (backfacing, or zero scanlines tall), else nonzero with lib->gradients / primMinY / primMaxY set.
+// Returns 0 to skip the triangle (backfacing, zero scanlines tall, or wholly outside the scissor), else nonzero with lib->gradients and the scissor-clamped primMinY / primMaxY set.
 ULONG MaggieSetupTri(struct MaggieTransVertex *v0 __asm("a0"),
 				struct MaggieTransVertex *v1 __asm("a1"),
 				struct MaggieTransVertex *v2 __asm("a2"),

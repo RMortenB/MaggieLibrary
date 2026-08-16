@@ -34,8 +34,14 @@ ULONG MaggieSetupTri(struct MaggieTransVertex *v0 __asm("a0"),
 	if(iy1 > maxy) maxy = iy1;
 	if(iy2 > maxy) maxy = iy2;
 
-	if(miny == maxy)
-		return 0;					// zero scanlines tall
+	// clamped to the scissor here, so the edge table only ever covers rows the span renderer will paint
+	if(miny < lib->scissor.y0)
+		miny = lib->scissor.y0;
+	if(maxy > lib->scissor.y1)
+		maxy = lib->scissor.y1;
+
+	if(miny >= maxy)
+		return 0;					// zero scanlines tall, or wholly outside the scissor
 
 	lib->primMinY = miny;
 	lib->primMaxY = maxy;

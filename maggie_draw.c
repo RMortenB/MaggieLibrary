@@ -10,6 +10,8 @@ float getBestDistance(magGradients *res, const struct MaggieTransVertex *vtx, in
 
 // The asm reaches into MaggieBase at hardcoded offsets (MB_* in raster/raster_structs.i), so a layout change must fail the build here rather than corrupt a field at runtime.
 _Static_assert(__builtin_offsetof(MaggieBase, gradients) == 35032, "MB_gradients in raster/raster_structs.i is stale");
+_Static_assert(__builtin_offsetof(MaggieBase, scissor.y0) == 460, "MB_scissorY0 in raster/raster_structs.i is stale");
+_Static_assert(__builtin_offsetof(MaggieBase, scissor.y1) == 468, "MB_scissorY1 in raster/raster_structs.i is stale");
 _Static_assert(__builtin_offsetof(MaggieBase, cullSign) == 158314, "MB_cullSign in raster/raster_structs.i is stale");
 _Static_assert(__builtin_offsetof(MaggieBase, primMinY) == 158318, "MB_primMinY in raster/raster_structs.i is stale");
 _Static_assert(__builtin_offsetof(MaggieBase, primMaxY) == 158322, "MB_primMaxY in raster/raster_structs.i is stale");

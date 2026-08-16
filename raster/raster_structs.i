@@ -88,6 +88,8 @@ ENDM
 
 ; MaggieBase fields the asm reaches directly, each guarded by a _Static_assert in maggie_draw.c. All sit ahead of the struct's #if PROFILE block, so these offsets hold for both builds.
 MB_gradients	EQU	35032
+MB_scissorY0	EQU	460
+MB_scissorY1	EQU	468
 MB_cullSign	EQU	158314
 MB_primMinY	EQU	158318
 MB_primMaxY	EQU	158322

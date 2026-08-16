@@ -27,7 +27,15 @@ void DrawEdge(struct MaggieTransVertex *vtx0, struct MaggieTransVertex *vtx1, in
 	}
 
 	int y0 = (int)vtx0->pos.y;
-	int lineLen = (int)vtx1->pos.y - y0;
+	int y1 = (int)vtx1->pos.y;
+
+	// The setup clamped [primMinY, primMaxY) to the scissor, and the edge table covers only those rows: trim the walk to them, with preStep carrying the skipped ones.
+	if(y0 < miny)
+		y0 = miny;
+	if(y1 > lib->primMaxY)
+		y1 = lib->primMaxY;
+
+	int lineLen = y1 - y0;
 
 	if(lineLen > 0)
 	{
