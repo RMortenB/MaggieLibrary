@@ -359,7 +359,7 @@ UWORD *magGetDepthBuffer(REG(a6, MaggieBase *lib)); // This is the live depth bu
 void magSetWorldMatrix(REG(a0, float *matrix), REG(a6, MaggieBase *lib));
 void magSetViewMatrix(REG(a0, float *matrix), REG(a6, MaggieBase *lib));
 void magSetPerspectiveMatrix(REG(a0, float *matrix), REG(a6, MaggieBase *lib));
-void magScissor(REG(d0, UWORD x0), REG(d1, UWORD y0), REG(d2, UWORD x1), REG(d3, UWORD x2), REG(a6, MaggieBase *lib));
+void magScissor(REG(d0, UWORD x), REG(d1, UWORD y), REG(d2, UWORD width), REG(d3, UWORD height), REG(a6, MaggieBase *lib));
 
 /*****************************************************************************/
 

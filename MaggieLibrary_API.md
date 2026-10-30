@@ -211,7 +211,8 @@ Set the current drawing mode.
   - The flags gets or'ed together, so
     - `MAG_DRAWMODE_DEPTHBUFFER | MAG_DRAWMODE_BILINEAR` enables the depth buffer together with bilinear texture filtering.
   - `MAG_DRAWMODE_NORMAL` This is just the mode to set when no other option is set.
-  - `MAG_DRAWMODE_DEPTHBUFFER` Enables depth buffering. The depth buffer used is a 16 bit w-buffer, so adjust your projection matrix accordingly.
+  - `MAG_DRAWMODE_DEPTHBUFFER` Enables depth buffering. The depth buffer is 16 bits and stores clip-space z/w (0 at the near plane, 1 at the far plane, as `mat4_perspective` produces), so keep the near plane as far out as the scene allows.
+  - `MAG_DRAWMODE_DEPTH_MASK` Masks depth writes: pixels are still depth tested but the depth buffer is not updated. Leave it off for normal depth buffering.
   - `MAG_DRAWMODE_BILINEAR` Enables bilinear textuer sampling
   - `MAG_DRAWMODE_32BIT` Must be specified when rendering to a 32 bit render target. The default is a 16 bit render target.
   - `MAG_DRAWMODE_LIGHTING` Enables the lights. See the [Lighting](#lighting) for how to use the lights.
