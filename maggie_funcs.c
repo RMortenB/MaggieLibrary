@@ -585,9 +585,9 @@ UWORD GetUserIndexBuffer(MaggieBase *lib)
 {
 	if(lib->upIndexBuffer == 0xffff)
 	{
-		lib->upIndexBuffer = magAllocateVertexBuffer(65535, lib);
+		lib->upIndexBuffer = magAllocateIndexBuffer(65535, lib);
 	}
-	return lib->upVertexBuffer;
+	return lib->upIndexBuffer;
 }
 
 /*****************************************************************************/
