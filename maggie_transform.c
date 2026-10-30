@@ -198,16 +198,22 @@ void magSetPerspectiveMatrix(REG(a0, float *matrix), REG(a6, MaggieBase *lib))
 
 /*****************************************************************************/
 
-void magScissor(REG(d0, UWORD x0), REG(d1, UWORD y0), REG(d2, UWORD x1), REG(d3, UWORD y1), REG(a6, MaggieBase *lib))
+// x, y, width, height as documented. The rasteriser treats scissor.x1/y1 as exclusive (span length is x1 - x0,
+// rows primMinY .. primMaxY - 1), as magSetScreenMemory's default (0, 0, xres, yres) does; clamping x1/y1 to
+// xres - 1 / yres - 1 made the last column and row unreachable.
+void magScissor(REG(d0, UWORD x), REG(d1, UWORD y), REG(d2, UWORD width), REG(d3, UWORD height), REG(a6, MaggieBase *lib))
 {
+	LONG x0 = (WORD)x, y0 = (WORD)y;
 	if(x0 < 0)
 		x0 = 0;
 	if(y0 < 0)
 		y0 = 0;
-	if(x1 >= lib->xres)
-		x1 = lib->xres - 1;
-	if(y1 >= lib->yres)
-		y1 = lib->yres - 1;
+	LONG x1 = x0 + width;
+	LONG y1 = y0 + height;
+	if(x1 > lib->xres)
+		x1 = lib->xres;
+	if(y1 > lib->yres)
+		y1 = lib->yres;
 
 	lib->scissor.x0 = x0;
 	lib->scissor.y0 = y0;

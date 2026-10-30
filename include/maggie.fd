@@ -63,7 +63,7 @@ magSetLightColour(light,colour)(d0,d1)
 magClearColour(colour)(d0)
 magClearDepth(depth)(d0)
 *
-magScissor(x0,y0,x1,y1)(d0,d1,d2,d3)
+magScissor(x,y,width,height)(d0,d1,d2,d3)
 *
 magDrawSprites(startVtx,nSprites,spriteSize)(d0,d1,fp0)
 magDrawSpritesUP(vtx,nSprites,spriteSize)(a0,d0,fp0)
