@@ -14,7 +14,7 @@
 /*****************************************************************************/
 
 #define MAG_DRAWMODE_AFFINE_MAPPING	0x1000
-#define MAG_DRAWMODE_DEPTH_MASK		0x2000
+#define MAG_DRAWMODE_DEPTH_MASK		0x2000	/* masks depth WRITES (the test still runs): leave it off for normal depth buffering */
 
 /*****************************************************************************/
 
