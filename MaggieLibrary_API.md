@@ -574,13 +574,13 @@ void magUploadIndexBuffer(UWORD iBuffer, UWORD *indx, UWORD startIndx, UWORD nIn
 Upload index data to a buffer.
 
 - Inputs
-  - vBuffer (d0)
+  - iBuffer (d0)
     - Index buffer to upload to.
-  - vtx (a0)
+  - indx (a0)
     - The index data to upload.
-  - startVtx (d1)
+  - startIndx (d1)
     - The start index of the upload.
-  - nVerts (d2)
+  - nIndx (d2)
     - The number of indices to upload
 
 - Outputs
@@ -867,22 +867,27 @@ Set the clear depth value.
 ### magScissor
 
 ```c
-void magScissor(UWORD x, UWORD y, UWORD width, UWORD height);
+void magScissor(UWORD x0, UWORD y0, UWORD x1, UWORD y1);
 ```
 
 Set the scissor rectangle for the draw.
 
 - Inputs
-  - x (d0)
-  - y (d1)
-  - width (d2)
-  - height (d3)
+  - x0 (d0)
+    - Left edge
+  - y0 (d1)
+    - Top edge
+  - x1 (d2)
+    - Right edge (inclusive)
+  - y1 (d3)
+    - Bottom edge (inclusive)
 
 - Output
   - None
 
 - Notes
-  - The values are clamped. x/y > 0x7fff clamps to 0
+  - The rectangle is given by two corners, not by a width and height.
+  - x1/y1 are clamped to the render target size minus one.
   - All values are in pixels
 
 ## Lighting
@@ -903,6 +908,7 @@ Set the type of a light source.
     - `MAG_LIGHT_POINT` - This light is a point light source.
     - `MAG_LIGHT_DIRECTIONAL` - This light is a directional light source.
     - `MAG_LIGHT_SPOT` - This light is a spot light source.
+    - `MAG_LIGHT_AMBIENT` - This light adds its intensity to every vertex. Position, direction, cone and attenuation are not used.
 
 - Outputs
   - None
@@ -1148,8 +1154,8 @@ Upload vertex colours.
 - Inputs
   - vBuffer (d0)
     - Handle to vertex buffer.
-  - vtx (a0)
-    - Colours to upload, in float uvw triplets.
+  - colours (a0)
+    - Colours to upload, one ULONG per vertex.
   - startVtx (d1)
     - First vertex colour to modify.
   - nVerts (d2)
